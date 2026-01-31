@@ -4,17 +4,12 @@ Een innovatieve schaakvariant waar spelers stukken kunnen "klikken" (combineren)
 
 ## 📋 Huidige Status
 
-**Versie:** v2.0 (TypeScript Modules)
-**Platform:** Web-based, volledig mobiel geoptimaliseerd
-**Laatst bijgewerkt:** 31 januari 2026
+**Versie:** v1.0-stable  
+**Bestandsgrootte:** 1368 regels HTML/CSS/JavaScript  
+**Platform:** Web-based, volledig mobiel geoptimaliseerd  
+**Laatst bijgewerkt:** 26 januari 2026  
 
-✅ **Week 1 Roadmap voltooid: TypeScript refactoring + i18n!**
-
-### Nieuwe Features in v2.0
-- 🔧 **TypeScript modules** - Clean code architecture
-- 🌍 **Internationalisatie** - Nederlands & Engels (taalswitch knop)
-- ⚡ **Vite build system** - Snelle development en optimized builds
-- 📦 **Modulaire structuur** - Makkelijk uitbreidbaar voor multiplayer
+✅ **Alle functionaliteit werkt perfect - 100% productie-klaar!**
 
 ## 🎮 Spelregels Samenvatting
 
@@ -425,80 +420,74 @@ Geklikte stukken = Som van beide!
 
 ## 📁 Projectstructuur
 
-### Huidige Structuur (v2.0 TypeScript)
+### Huidig (Productie-klaar)
 ```
 klikschaak/
-├── index.html              # Entry point voor Vite
-├── klikschaak.html         # Legacy single-file versie (v1.0)
-├── package.json            # NPM configuratie
-├── tsconfig.json           # TypeScript configuratie
-├── vite.config.ts          # Vite build configuratie
-├── README.md               # Deze documentatie
-├── regelsklikschaak.pdf    # Officiële regels
-└── src/
-    ├── main.ts             # Application entry point
-    ├── game/
-    │   ├── index.ts        # Game module exports
-    │   ├── types.ts        # TypeScript type definitions
-    │   ├── constants.ts    # Piece symbols, values, helpers
-    │   ├── state.ts        # Game state management
-    │   ├── moves.ts        # Move generation & validation
-    │   └── actions.ts      # Game actions (move, castle, etc.)
-    ├── i18n/
-    │   ├── index.ts        # i18n module exports
-    │   └── translations.ts # NL/EN translations
-    ├── ui/
-    │   ├── index.ts        # UI module exports
-    │   └── render.ts       # Board rendering & dialogs
-    └── styles/
-        └── main.css        # All CSS styles
+├── README.md           # Deze documentatie
+├── klikschaak.html     # 1368 regels - volledig werkend!
+└── regelsklikschaak.pdf # Officiële regels
 ```
 
-### Development Commands
-```bash
-npm run dev      # Start development server (localhost:3000)
-npm run build    # Build for production
-npm run preview  # Preview production build
-```
-
-### Multiplayer (Toekomstig - Week 2-4)
+### Multiplayer (Toekomstig)
 ```
 klikschaak/
 ├── src/
-│   ├── ...               # Huidige structuur
-│   └── multiplayer/      # Socket.io client
-└── server/
-    ├── index.ts          # Express server
-    ├── socket-server.ts  # Socket.io handlers
-    └── validation.ts     # Server-side move validation
+│   ├── client/
+│   │   ├── game/      # Logica
+│   │   ├── ui/        # Rendering
+│   │   └── multiplayer/ # Netwerk
+│   └── server/
+│       ├── index.js
+│       ├── socket-server.js
+│       └── validation.js
+└── tests/
 ```
 
 ## 🎯 Roadmap (4 weken)
 
-**Week 1:** ✅ Refactoring (VOLTOOID)
-- ✅ Split in TypeScript modules
-- ✅ **Internationalisatie (i18n) systeem**
-  - ✅ Engels vertaling
-  - ✅ Taalswitch knop in UI
-  - ✅ Translations object structuur
-  - ✅ Basis voor meer talen (Frans, Duits, etc.)
+**Week 1:** Refactoring ✅ **KLAAR**
+- Split in modules
+- **Internationalisatie (i18n) systeem**
+  - Engels vertaling
+  - Taalswitch knop in UI
+  - Translations object structuur
+  - Basis voor meer talen (Frans, Duits, etc.)
 
-**Week 2:** Backend - Express + Socket.io
-- User authentication (JWT)
-- **Invite code systeem** (gesloten beta)
-- Database setup (users, games, invites)
+**Week 2:** UI Enhancement + Backend Start
+- **🖱️ Drag-and-Drop systeem**
+  - Desktop: HTML5 Drag & Drop API
+  - Mobile: Touch events (touchstart, touchmove, touchend)
+  - Visual feedback tijdens drag (ghost piece, target highlighting)
+  - Smooth animations (piece placement, capture)
+  - Fallback naar click-click (blijft werken)
+- **⚡ Premove systeem**
+  - Queue moves tijdens opponent's beurt
+  - Visual indicator (premove arrow/highlight)
+  - Cancel premove (right-click / long-press)
+  - Execute immediately when turn starts
+  - Works met drag-and-drop én click-click
+- Backend setup start
+  - Express server basis
+  - Socket.io verbinding
+  - Database schema design
 
 **Week 3:** Multiplayer - real-time sync
+- User authentication (JWT)
+- **Invite code systeem** (gesloten beta)
 - **Online lobby** (zie wie online is)
 - Friend code systeem (speel met bekenden)
 - Real-time game synchronisatie
+  - Move sync (incl. premoves)
+  - Timer sync
+  - Drag position sync (zie opponent's piece bewegen)
 - Spectator mode (optioneel)
 
 **Week 4:** Polish - accounts, rating, replay
 - Basic stats (wins/losses/draws)
-- Game history
+- Game history (with premove playback)
 - Profile pages
 - Bug fixes & optimization
+- Mobile gesture improvements
 
 ## 🏗️ Product Roadmap & Architecture
 
@@ -1008,6 +997,473 @@ socket.emit('move', {
 - Daarna: speler verliest op tijd
 - Bij reconnect binnen 30 sec → game gewoon verder
 
+## 🖱️ Drag-and-Drop Systeem (Week 2)
+
+### Concept
+
+Klikschaak moet aanvoelen zoals Lichess/Chess.com:
+- **Drag piece** → **Drop on target** = Intuïtief
+- **Click piece** → **Click target** = Blijft werken (fallback)
+- Works op desktop én mobile
+
+### Desktop Implementation (HTML5 Drag & Drop)
+
+```typescript
+// Piece draggable maken
+interface DragData {
+  from: Position;
+  pieces: string[];
+  isUnklik: boolean;
+  unklikPiece?: string;
+}
+
+function makePieceDraggable(square: HTMLElement, pos: Position) {
+  square.draggable = true;
+  
+  square.addEventListener('dragstart', (e) => {
+    const pieces = board[pos.row][pos.col].pieces;
+    if (pieces.length === 0) return;
+    
+    // Set drag data
+    const dragData: DragData = {
+      from: pos,
+      pieces: pieces,
+      isUnklik: false
+    };
+    e.dataTransfer?.setData('application/json', JSON.stringify(dragData));
+    
+    // Ghost image (visual feedback)
+    const ghost = createGhostPiece(pieces);
+    e.dataTransfer?.setDragImage(ghost, 20, 20);
+    
+    // Highlight valid moves
+    showValidMoves(pos);
+  });
+  
+  square.addEventListener('dragend', () => {
+    clearHighlights();
+  });
+}
+
+// Drop target maken
+function makeSquareDroppable(square: HTMLElement, pos: Position) {
+  square.addEventListener('dragover', (e) => {
+    e.preventDefault(); // Allow drop
+    square.classList.add('drag-over');
+  });
+  
+  square.addEventListener('dragleave', () => {
+    square.classList.remove('drag-over');
+  });
+  
+  square.addEventListener('drop', (e) => {
+    e.preventDefault();
+    square.classList.remove('drag-over');
+    
+    const data = JSON.parse(e.dataTransfer?.getData('application/json') || '{}');
+    handleMove(data.from, pos, data);
+  });
+}
+
+// Ghost piece voor visual feedback
+function createGhostPiece(pieces: string[]): HTMLElement {
+  const ghost = document.createElement('div');
+  ghost.style.fontSize = '40px';
+  ghost.style.opacity = '0.7';
+  ghost.innerHTML = pieces.map(p => PS[p]).join('');
+  document.body.appendChild(ghost);
+  setTimeout(() => ghost.remove(), 0);
+  return ghost;
+}
+```
+
+### Mobile Implementation (Touch Events)
+
+```typescript
+interface TouchState {
+  dragging: boolean;
+  from: Position | null;
+  ghostElement: HTMLElement | null;
+  touchStartPos: { x: number; y: number };
+}
+
+const touchState: TouchState = {
+  dragging: false,
+  from: null,
+  ghostElement: null,
+  touchStartPos: { x: 0, y: 0 }
+};
+
+function handleTouchStart(e: TouchEvent, pos: Position) {
+  const touch = e.touches[0];
+  touchState.touchStartPos = { x: touch.clientX, y: touch.clientY };
+  touchState.from = pos;
+  
+  // Create ghost piece that follows finger
+  touchState.ghostElement = createMobileGhost(board[pos.row][pos.col].pieces);
+  updateGhostPosition(touch.clientX, touch.clientY);
+  
+  // Highlight valid moves
+  showValidMoves(pos);
+}
+
+function handleTouchMove(e: TouchEvent) {
+  if (!touchState.from) return;
+  e.preventDefault(); // Prevent scrolling
+  
+  const touch = e.touches[0];
+  touchState.dragging = true;
+  updateGhostPosition(touch.clientX, touch.clientY);
+  
+  // Highlight square under finger
+  const target = getSquareAtPosition(touch.clientX, touch.clientY);
+  if (target) {
+    highlightDropTarget(target);
+  }
+}
+
+function handleTouchEnd(e: TouchEvent) {
+  if (!touchState.from || !touchState.dragging) {
+    // Short tap = click-click fallback
+    handleClick(touchState.from);
+    cleanup();
+    return;
+  }
+  
+  const touch = e.changedTouches[0];
+  const target = getSquareAtPosition(touch.clientX, touch.clientY);
+  
+  if (target && isValidMove(touchState.from, target)) {
+    handleMove(touchState.from, target);
+  }
+  
+  cleanup();
+}
+
+function cleanup() {
+  touchState.ghostElement?.remove();
+  touchState.dragging = false;
+  touchState.from = null;
+  clearHighlights();
+}
+```
+
+### Visual Feedback
+
+```css
+/* Dragging */
+.square.dragging {
+  opacity: 0.5;
+}
+
+.square.drag-over {
+  background: rgba(0, 255, 0, 0.3) !important;
+  transform: scale(1.05);
+  transition: all 0.1s;
+}
+
+/* Ghost piece */
+.ghost-piece {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  font-size: 40px;
+  opacity: 0.8;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+  transform: translate(-50%, -50%);
+}
+
+/* Valid move targets */
+.valid-move-target::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 30%;
+  height: 30%;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.valid-move-capture::after {
+  width: 80%;
+  height: 80%;
+  border: 3px solid rgba(255, 0, 0, 0.5);
+  border-radius: 50%;
+  background: none;
+}
+
+/* Smooth piece placement */
+.piece-placed {
+  animation: placePiece 0.2s ease-out;
+}
+
+@keyframes placePiece {
+  0% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+```
+
+## ⚡ Premove Systeem (Week 2)
+
+### Concept
+
+Zoals Lichess/Chess.com: **plan je volgende zet tijdens opponent's beurt**
+
+**Use cases:**
+- Bullet chess (1 min): elke milliseconde telt
+- Blitz chess: snelle openingen
+- Voorspelbare replies: opponent heeft maar 1 legale zet
+
+### How It Works
+
+```typescript
+interface Premove {
+  from: Position;
+  to: Position;
+  isUnklik: boolean;
+  unklikPiece?: string;
+  promotionChoice?: string;
+}
+
+class PremoveManager {
+  private premove: Premove | null = null;
+  private premoveArrow: HTMLElement | null = null;
+  
+  // Set premove during opponent's turn
+  setPremove(from: Position, to: Position) {
+    if (isMyTurn()) return; // Can't premove on your turn
+    
+    this.premove = { from, to, isUnklik: false };
+    this.showPremoveArrow(from, to);
+    this.highlightPremove(from, to);
+  }
+  
+  // Execute when turn starts
+  executePremove() {
+    if (!this.premove) return;
+    
+    // Validate premove is still legal
+    if (!isValidMove(this.premove.from, this.premove.to)) {
+      this.clearPremove();
+      return;
+    }
+    
+    // Execute immediately
+    handleMove(this.premove.from, this.premove.to);
+    this.clearPremove();
+  }
+  
+  // Cancel premove
+  clearPremove() {
+    this.premove = null;
+    this.premoveArrow?.remove();
+    clearPremoveHighlights();
+  }
+  
+  // Visual arrow like Lichess
+  showPremoveArrow(from: Position, to: Position) {
+    const arrow = document.createElement('div');
+    arrow.className = 'premove-arrow';
+    
+    // Calculate arrow position and rotation
+    const fromSquare = getSquareElement(from);
+    const toSquare = getSquareElement(to);
+    const fromRect = fromSquare.getBoundingClientRect();
+    const toRect = toSquare.getBoundingClientRect();
+    
+    const angle = Math.atan2(
+      toRect.top - fromRect.top,
+      toRect.left - fromRect.left
+    ) * 180 / Math.PI;
+    
+    const length = Math.hypot(
+      toRect.left - fromRect.left,
+      toRect.top - fromRect.top
+    );
+    
+    arrow.style.cssText = `
+      position: absolute;
+      left: ${fromRect.left + fromRect.width/2}px;
+      top: ${fromRect.top + fromRect.height/2}px;
+      width: ${length}px;
+      height: 4px;
+      background: rgba(255, 170, 0, 0.8);
+      transform: rotate(${angle}deg);
+      transform-origin: 0 50%;
+      pointer-events: none;
+      z-index: 100;
+    `;
+    
+    document.body.appendChild(arrow);
+    this.premoveArrow = arrow;
+  }
+}
+
+// Global premove manager
+const premoveManager = new PremoveManager();
+
+// Integration with drag-and-drop
+function handleDrop(from: Position, to: Position) {
+  if (isMyTurn()) {
+    // Normal move
+    handleMove(from, to);
+  } else {
+    // Set premove
+    premoveManager.setPremove(from, to);
+  }
+}
+
+// Execute on turn change
+socket.on('turn-changed', (newTurn: 'white' | 'black') => {
+  if (newTurn === myColor) {
+    premoveManager.executePremove();
+  }
+});
+
+// Cancel premove on right-click (desktop) or long-press (mobile)
+boardElement.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  premoveManager.clearPremove();
+});
+
+// Long-press for mobile
+let longPressTimer: number;
+boardElement.addEventListener('touchstart', () => {
+  longPressTimer = setTimeout(() => {
+    premoveManager.clearPremove();
+    vibrate(50); // Haptic feedback
+  }, 500);
+});
+boardElement.addEventListener('touchend', () => {
+  clearTimeout(longPressTimer);
+});
+```
+
+### Premove Visual Indicators
+
+```css
+/* Premove arrow (like Lichess) */
+.premove-arrow {
+  box-shadow: 0 0 8px rgba(255, 170, 0, 0.8);
+}
+
+.premove-arrow::after {
+  content: '';
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 10px solid rgba(255, 170, 0, 0.8);
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+}
+
+/* Premove squares */
+.premove-from {
+  box-shadow: inset 0 0 0 3px rgba(255, 170, 0, 0.6);
+}
+
+.premove-to {
+  box-shadow: inset 0 0 0 3px rgba(255, 170, 0, 0.6);
+  background: rgba(255, 170, 0, 0.2) !important;
+}
+
+/* Premove animation when executed */
+@keyframes premoveExecute {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.premove-executed {
+  animation: premoveExecute 0.3s ease-out;
+}
+```
+
+### Advanced Premove Features
+
+**Multi-premove (advanced):**
+```typescript
+// Queue multiple premoves
+class AdvancedPremoveManager extends PremoveManager {
+  private premoveQueue: Premove[] = [];
+  
+  addPremove(from: Position, to: Position) {
+    this.premoveQueue.push({ from, to, isUnklik: false });
+    this.showPremoveChain();
+  }
+  
+  executeNextPremove() {
+    const next = this.premoveQueue.shift();
+    if (!next) return;
+    
+    if (isValidMove(next.from, next.to)) {
+      handleMove(next.from, next.to);
+      // Next premove executes after opponent's response
+    } else {
+      // Chain breaks if move becomes illegal
+      this.clearAllPremoves();
+    }
+  }
+}
+```
+
+**Premove with captures:**
+```typescript
+// Handle premove when target square changes
+function validatePremoveAfterOpponentMove(opponentMove: Move) {
+  const premove = premoveManager.getPremove();
+  if (!premove) return;
+  
+  // If opponent moved to our premove target, cancel
+  if (positionsEqual(opponentMove.to, premove.to)) {
+    premoveManager.clearPremove();
+    return;
+  }
+  
+  // If our premove piece was captured, cancel
+  if (positionsEqual(opponentMove.to, premove.from)) {
+    premoveManager.clearPremove();
+    return;
+  }
+  
+  // Otherwise execute
+  premoveManager.executePremove();
+}
+```
+
+### Week 2 Integration Checklist
+
+**Drag-and-Drop:**
+- [ ] Desktop drag & drop (HTML5 API)
+- [ ] Mobile touch events
+- [ ] Ghost piece visual
+- [ ] Valid move highlighting
+- [ ] Smooth animations
+- [ ] Click-click fallback
+
+**Premoves:**
+- [ ] Set premove on opponent's turn
+- [ ] Visual arrow indicator
+- [ ] Execute on turn change
+- [ ] Cancel on right-click/long-press
+- [ ] Validate before execution
+- [ ] Handle edge cases (captures, checks)
+
+**Testing:**
+- [ ] Desktop Chrome/Firefox/Safari
+- [ ] Mobile Chrome/Safari
+- [ ] Touch gestures (tap, drag, long-press)
+- [ ] Premove in bullet games
+- [ ] Premove cancellation
+- [ ] Edge cases (illegal premoves)
+
+
+
 ### Database Schema (Voorgesteld)
 
 ```javascript
@@ -1263,14 +1719,15 @@ volgens src/ structuur."
 
 ---
 
-**STATUS**: ✅ 100% PRODUCTIE-KLAAR!  
-**Laatst bijgewerkt**: 26 januari 2026  
-**Versie**: 1.0-stable  
-**Regels**: 1368  
-**Bugs**: 0  
-**Klaar voor**: Multiplayer development & Deployment  
+**STATUS**: ✅ Week 1 KLAAR - Ready for Week 2!  
+**Laatst bijgewerkt**: 31 januari 2026  
+**Versie**: 2.0-dev (TypeScript modules)  
+**Volgende stap**: Drag-and-drop + Premoves  
 
-🎉 **KLAAR OM TE DELEN EN TE HOSTEN!** 🎉
+📋 **WEEK 2 FEATURES:**  
+🖱️ Drag-and-drop (desktop + mobile)  
+⚡ Premove systeem (queue moves)  
+🎨 Visual feedback (arrows, highlights)  
 
 ---
 
