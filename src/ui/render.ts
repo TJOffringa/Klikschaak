@@ -57,7 +57,7 @@ function updateStaticTexts(): void {
 
   // Update language button
   const langBtn = document.getElementById('langBtn');
-  if (langBtn) langBtn.textContent = getLanguage() === 'nl' ? '🇬🇧' : '🇳🇱';
+  if (langBtn) langBtn.textContent = getLanguage() === 'nl' ? 'EN' : 'NL';
 }
 
 function renderPiece(pieces: Piece[], row: number, col: number, isSelected: boolean): string {

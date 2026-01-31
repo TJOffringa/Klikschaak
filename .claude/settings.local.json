@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nrefactor: migrate to TypeScript modules with i18n support \\(Week 1\\)\n\n- Split single-file HTML into modular TypeScript architecture\n- Add internationalization \\(NL/EN\\) with language switch button\n- Set up Vite build system for development and production\n- Create separate modules: game logic, state, moves, UI rendering\n- Keep legacy klikschaak.html as standalone version\n- Update README with new project structure and commands\n\nNew structure:\n- src/game/ - Game logic, state management, move validation\n- src/i18n/ - Translations and language switching\n- src/ui/ - Board rendering and dialogs\n- src/styles/ - CSS styles\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(npm run build:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nbuild: add production build for GitHub Pages\n\n- Build TypeScript to bundled JS/CSS for static hosting\n- Move dev index.html to index.dev.html\n- Add compiled assets/ folder with hashed filenames\n- Update README with Week 2 roadmap \\(drag-drop, premoves\\)\n\nGitHub Pages now serves the production build at /index.html\nDevelopment version available at /index.dev.html \\(requires Vite\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)"
+    ]
+  }
+}
