@@ -4,12 +4,17 @@ Een innovatieve schaakvariant waar spelers stukken kunnen "klikken" (combineren)
 
 ## 📋 Huidige Status
 
-**Versie:** v1.0-stable  
-**Bestandsgrootte:** 1368 regels HTML/CSS/JavaScript  
-**Platform:** Web-based, volledig mobiel geoptimaliseerd  
-**Laatst bijgewerkt:** 26 januari 2026  
+**Versie:** v2.0 (TypeScript Modules)
+**Platform:** Web-based, volledig mobiel geoptimaliseerd
+**Laatst bijgewerkt:** 31 januari 2026
 
-✅ **Alle functionaliteit werkt perfect - 100% productie-klaar!**
+✅ **Week 1 Roadmap voltooid: TypeScript refactoring + i18n!**
+
+### Nieuwe Features in v2.0
+- 🔧 **TypeScript modules** - Clean code architecture
+- 🌍 **Internationalisatie** - Nederlands & Engels (taalswitch knop)
+- ⚡ **Vite build system** - Snelle development en optimized builds
+- 📦 **Modulaire structuur** - Makkelijk uitbreidbaar voor multiplayer
 
 ## 🎮 Spelregels Samenvatting
 
@@ -420,38 +425,63 @@ Geklikte stukken = Som van beide!
 
 ## 📁 Projectstructuur
 
-### Huidig (Productie-klaar)
+### Huidige Structuur (v2.0 TypeScript)
 ```
 klikschaak/
-├── README.md           # Deze documentatie
-├── klikschaak.html     # 1368 regels - volledig werkend!
-└── regelsklikschaak.pdf # Officiële regels
+├── index.html              # Entry point voor Vite
+├── klikschaak.html         # Legacy single-file versie (v1.0)
+├── package.json            # NPM configuratie
+├── tsconfig.json           # TypeScript configuratie
+├── vite.config.ts          # Vite build configuratie
+├── README.md               # Deze documentatie
+├── regelsklikschaak.pdf    # Officiële regels
+└── src/
+    ├── main.ts             # Application entry point
+    ├── game/
+    │   ├── index.ts        # Game module exports
+    │   ├── types.ts        # TypeScript type definitions
+    │   ├── constants.ts    # Piece symbols, values, helpers
+    │   ├── state.ts        # Game state management
+    │   ├── moves.ts        # Move generation & validation
+    │   └── actions.ts      # Game actions (move, castle, etc.)
+    ├── i18n/
+    │   ├── index.ts        # i18n module exports
+    │   └── translations.ts # NL/EN translations
+    ├── ui/
+    │   ├── index.ts        # UI module exports
+    │   └── render.ts       # Board rendering & dialogs
+    └── styles/
+        └── main.css        # All CSS styles
 ```
 
-### Multiplayer (Toekomstig)
+### Development Commands
+```bash
+npm run dev      # Start development server (localhost:3000)
+npm run build    # Build for production
+npm run preview  # Preview production build
+```
+
+### Multiplayer (Toekomstig - Week 2-4)
 ```
 klikschaak/
 ├── src/
-│   ├── client/
-│   │   ├── game/      # Logica
-│   │   ├── ui/        # Rendering
-│   │   └── multiplayer/ # Netwerk
-│   └── server/
-│       ├── index.js
-│       ├── socket-server.js
-│       └── validation.js
-└── tests/
+│   ├── ...               # Huidige structuur
+│   └── multiplayer/      # Socket.io client
+└── server/
+    ├── index.ts          # Express server
+    ├── socket-server.ts  # Socket.io handlers
+    └── validation.ts     # Server-side move validation
 ```
 
 ## 🎯 Roadmap (4 weken)
 
-**Week 1:** Refactoring
-- Split in modules
-- **Internationalisatie (i18n) systeem**
-  - Engels vertaling
-  - Taalswitch knop in UI
-  - Translations object structuur
-  - Basis voor meer talen (Frans, Duits, etc.)
+**Week 1:** ✅ Refactoring (VOLTOOID)
+- ✅ Split in TypeScript modules
+- ✅ **Internationalisatie (i18n) systeem**
+  - ✅ Engels vertaling
+  - ✅ Taalswitch knop in UI
+  - ✅ Translations object structuur
+  - ✅ Basis voor meer talen (Frans, Duits, etc.)
 
 **Week 2:** Backend - Express + Socket.io
 - User authentication (JWT)

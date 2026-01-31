@@ -1,0 +1,32 @@
+{
+  "name": "klikschaak",
+  "version": "2.0.0",
+  "description": "Een innovatieve schaakvariant waar spelers stukken kunnen \"klikken\" (combineren) op hetzelfde veld voor strategische voordelen.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tjoffringa/klikschaak.git"
+  },
+  "keywords": [
+    "chess",
+    "klikschaak",
+    "clickchess",
+    "game",
+    "strategy"
+  ],
+  "author": "Tjaart Offringa",
+  "license": "CC-BY-NC-SA-4.0",
+  "bugs": {
+    "url": "https://github.com/tjoffringa/klikschaak/issues"
+  },
+  "homepage": "https://github.com/tjoffringa/klikschaak#readme",
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  }
+}
