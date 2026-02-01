@@ -10,9 +10,31 @@ import {
 import * as state from './state';
 import { getCombinedMoves, getPieceMoves, wouldBeInCheck, isInCheck, hasLegalMoves } from './moves';
 import { renderBoard, updateUI, showCheckIndicator, showGameOver, showPromotionDialog, showCastlingChoiceDialog, showEnPassantChoiceDialog } from '../ui/render';
+import { isOnline, isMyTurn, sendMove, getMyColor } from '../multiplayer/onlineGame';
 
 export function handleSquareClick(row: number, col: number): void {
   if (state.isGameOver()) return;
+
+  // In online mode, only allow moves on your turn
+  if (isOnline() && !isMyTurn()) {
+    // Can still select pieces to see valid moves
+    const board = state.getBoard();
+    const square = board[row][col];
+    const myColor = getMyColor();
+
+    if (square.pieces.length > 0 && isWhitePiece(square.pieces[0]) === (myColor === 'white')) {
+      state.setSelectedSquare([row, col]);
+      state.setSelectedUnklikPiece(null);
+      const moves = getCombinedMoves(
+        board, row, col, square.pieces,
+        state.getCastlingRights(), state.getEnPassantTarget(), state.getMovedPawns(), null
+      );
+      state.setValidMoves(moves);
+      renderBoard();
+      updateUI();
+    }
+    return;
+  }
 
   const board = state.getBoard();
   const square = board[row][col];
@@ -71,6 +93,9 @@ export function handleUnklikSelect(row: number, col: number, pieceIndex: number,
   if (state.isGameOver()) return;
   e.stopPropagation();
 
+  // In online mode, only allow on your turn
+  if (isOnline() && !isMyTurn()) return;
+
   const board = state.getBoard();
   const square = board[row][col];
   const selectedPiece = square.pieces[pieceIndex];
@@ -128,6 +153,19 @@ export function handleUnklikSelect(row: number, col: number, pieceIndex: number,
 }
 
 export function executeCastling(fromRow: number, fromCol: number, toRow: number, toCol: number, castleType: MoveType): void {
+  // In online mode, send move to server
+  if (isOnline()) {
+    sendMove(
+      { row: fromRow, col: fromCol },
+      { row: toRow, col: toCol },
+      castleType
+    );
+    state.clearSelection();
+    renderBoard();
+    updateUI();
+    return;
+  }
+
   const board = state.getBoard();
   const isKingSide = castleType.startsWith('castle-k');
   const rookCol = isKingSide ? 7 : 0;
@@ -181,7 +219,52 @@ export function executeCastling(fromRow: number, fromCol: number, toRow: number,
   checkForCheckmate();
 }
 
-export function movePiece(fromRow: number, fromCol: number, toRow: number, toCol: number, moveType: MoveType): void {
+export function movePiece(fromRow: number, fromCol: number, toRow: number, toCol: number, moveType: MoveType, promoteTo?: Piece): void {
+  // In online mode, send move to server (except for promotion which needs piece selection)
+  if (isOnline()) {
+    const selectedUnklikPiece = state.getSelectedUnklikPiece();
+    const board = state.getBoard();
+    const fromSq = board[fromRow][fromCol];
+    const hasPawn = fromSq.pieces.some(p => isPawn(p));
+    const isWhite = isWhitePiece(fromSq.pieces[0]);
+    const isPromotionRank = (isWhite && toRow === 0) || (!isWhite && toRow === 7);
+
+    // Check if this is a promotion move that needs piece selection
+    if (hasPawn && isPromotionRank && !promoteTo && !state.isAutoPromoteEnabled()) {
+      // Store pending promotion state for online
+      const promotion: PendingPromotion = {
+        row: toRow,
+        col: toCol,
+        isWhite,
+        moveNotation: '',
+      };
+      // Store move info for later
+      (promotion as any).fromRow = fromRow;
+      (promotion as any).fromCol = fromCol;
+      (promotion as any).moveType = moveType;
+      (promotion as any).unklikIndex = selectedUnklikPiece;
+      state.setPendingPromotion(promotion);
+      showPromotionDialog();
+      return;
+    }
+
+    const promoTo = promoteTo || (state.isAutoPromoteEnabled() && hasPawn && isPromotionRank
+      ? (isWhite ? 'Q' : 'q') as Piece
+      : undefined);
+
+    sendMove(
+      { row: fromRow, col: fromCol },
+      { row: toRow, col: toCol },
+      moveType,
+      selectedUnklikPiece !== null ? selectedUnklikPiece : undefined,
+      promoTo
+    );
+    state.clearSelection();
+    renderBoard();
+    updateUI();
+    return;
+  }
+
   const board = state.getBoard();
   const fromSq = board[fromRow][fromCol];
   const toSq = board[toRow][toCol];
@@ -368,6 +451,27 @@ export function executePromotion(piece: Piece): void {
   const promotion = state.getPendingPromotion();
   if (!promotion) return;
 
+  // Remove promotion overlay
+  const overlay = document.getElementById('promotionOverlay');
+  if (overlay) overlay.remove();
+
+  // In online mode, send move with promotion piece
+  if (isOnline()) {
+    const { fromRow, fromCol, moveType, unklikIndex } = promotion as any;
+    sendMove(
+      { row: fromRow, col: fromCol },
+      { row: promotion.row, col: promotion.col },
+      moveType || 'normal',
+      unklikIndex,
+      piece
+    );
+    state.clearSelection();
+    state.setPendingPromotion(null);
+    renderBoard();
+    updateUI();
+    return;
+  }
+
   const { row, col, moveNotation } = promotion;
 
   // Replace the pawn with the chosen piece
@@ -376,10 +480,6 @@ export function executePromotion(piece: Piece): void {
   newPieces.unshift(piece);
 
   state.setBoardSquare(row, col, newPieces);
-
-  // Remove promotion overlay
-  const overlay = document.getElementById('promotionOverlay');
-  if (overlay) overlay.remove();
 
   const finalNotation = moveNotation + '=' + PIECE_SYMBOLS[piece];
 
