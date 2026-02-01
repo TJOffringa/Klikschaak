@@ -27,6 +27,7 @@ export interface DbUser {
     losses: number;
     draws: number;
   };
+  is_admin: boolean;
 }
 
 export interface DbInviteCode {

@@ -4,6 +4,7 @@ import { createServer } from 'http';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes.js';
 import gameRoutes from './routes/game.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 import { setupSocketIO } from './socket/index.js';
 
 // Load environment variables
@@ -30,6 +31,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/games', gameRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 handler
 app.use((req, res) => {

@@ -469,6 +469,136 @@
   50% { opacity: 0.7; }
 }
 
+/* Admin Button */
+.admin-btn {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  margin-left: 8px;
+}
+
+.admin-btn:hover {
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4) !important;
+}
+
+/* Admin Panel */
+.admin-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 16px;
+  min-width: 600px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow: hidden;
+  z-index: 300;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.admin-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.admin-panel-header h2 {
+  margin: 0;
+  color: #f1f5f9;
+  font-size: 18px;
+}
+
+.admin-close-btn {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.admin-close-btn:hover {
+  color: #ef4444;
+}
+
+.admin-panel-content {
+  padding: 20px;
+  overflow-y: auto;
+  max-height: calc(80vh - 60px);
+}
+
+/* Admin Table */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.admin-table th {
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.admin-table td {
+  color: #f1f5f9;
+}
+
+.admin-table tr:hover td {
+  background: rgba(148, 163, 184, 0.05);
+}
+
+/* Admin Action Buttons */
+.admin-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 16px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.admin-action-btn:hover {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.admin-action-btn.delete-user:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* Admin Panel Error */
+.admin-panel-content .error {
+  color: #ef4444;
+  text-align: center;
+  padding: 20px;
+}
+
+/* Admin Panel Backdrop */
+.admin-panel::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: -1;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   #authContainer {

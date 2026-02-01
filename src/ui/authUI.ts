@@ -3,6 +3,7 @@ import { connectSocket, disconnectSocket } from '../multiplayer/socket.js';
 import { setupLobbyListeners } from '../multiplayer/lobby.js';
 import { setupGameListeners } from '../multiplayer/onlineGame.js';
 import { showLobbyUI, hideLobbyUI } from './lobbyUI.js';
+import { initAdminUI } from './adminUI.js';
 
 let authContainer: HTMLElement | null = null;
 
@@ -19,6 +20,7 @@ export function initAuthUI(): void {
   if (isAuthenticated()) {
     showUserStatus();
     initializeMultiplayer();
+    initAdminUI();
   } else {
     showAuthButtons();
   }
@@ -118,6 +120,7 @@ async function handleLogin(e: Event): Promise<void> {
   if (result.success) {
     showUserStatus();
     initializeMultiplayer();
+    initAdminUI();
   } else {
     if (errorEl) errorEl.textContent = result.error || 'Login failed';
   }
@@ -136,6 +139,7 @@ async function handleRegister(e: Event): Promise<void> {
   if (result.success) {
     showUserStatus();
     initializeMultiplayer();
+    initAdminUI();
   } else {
     if (errorEl) errorEl.textContent = result.error || 'Registration failed';
   }

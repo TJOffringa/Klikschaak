@@ -60,6 +60,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
     username: user.username,
     friendCode: user.friend_code,
     stats: user.stats,
+    isAdmin: user.is_admin || false,
   });
 });
 
