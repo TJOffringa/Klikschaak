@@ -1,9 +1,8 @@
-import { register, login, logout, isAuthenticated, getCurrentUser, User } from '../multiplayer/auth.js';
+import { register, login, logout, isAuthenticated, getCurrentUser } from '../multiplayer/auth.js';
 import { connectSocket, disconnectSocket } from '../multiplayer/socket.js';
 import { setupLobbyListeners } from '../multiplayer/lobby.js';
 import { setupGameListeners } from '../multiplayer/onlineGame.js';
 import { showLobbyUI, hideLobbyUI } from './lobbyUI.js';
-import { getTranslation } from '../i18n/translations.js';
 
 let authContainer: HTMLElement | null = null;
 

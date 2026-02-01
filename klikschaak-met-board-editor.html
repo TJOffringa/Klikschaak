@@ -1,0 +1,2090 @@
+<!DOCTYPE html>
+<!--
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                              KLIKSCHAAK                                    ║
+║                   Interactive Chess Variant Game                          ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║                                                                            ║
+║  Copyright (c) 2026 Tjaart Offringa                                       ║
+║  Licensed under CC BY-NC-SA 4.0                                           ║
+║  https://creativecommons.org/licenses/by-nc-sa/4.0/                       ║
+║                                                                            ║
+║  You are free to:                                                         ║
+║    ✓ Share — copy and redistribute                                        ║
+║    ✓ Adapt — remix, transform, and build upon                            ║
+║                                                                            ║
+║  Under the following terms:                                               ║
+║    • Attribution — Give appropriate credit                                ║
+║    • NonCommercial — No commercial use                                    ║
+║    • ShareAlike — Same license for derivatives                            ║
+║                                                                            ║
+║  Based on Klikschaak rules by Johan Visser & Casper Rupert               ║
+║  More info: www.klikschaak.nl                                             ║
+║                                                                            ║
+║  GitHub: https://github.com/TJOffringa/Klikschaak                         ║
+║  Version: 1.0-stable (28 januari 2026)                                    ║
+║  Lines: 1369                                                              ║
+║                                                                            ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+-->
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klikschaak - Interactieve Schaakvariant</title>
+    
+    <!-- Favicon (essentials only) -->
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="favicon-192x192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon-180x180.png">
+    
+    <!-- Meta Tags -->
+    <meta name="description" content="Klikschaak - Combineer schaakstukken voor strategische dominantie. Een innovatieve schaakvariant waar je stukken kunt klikken op hetzelfde veld.">
+    <meta name="keywords" content="klikschaak, schaak, chess, variant, clickchess, combineren, strategie">
+    <meta name="author" content="Tjaart Offringa">
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#f0d9b5">
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #0f172a, #1e40af, #0f172a); min-height: 100vh; padding: 20px; color: white; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { font-size: 48px; margin-bottom: 10px; }
+        .header p { color: #cbd5e1; }
+        .main-grid { display: grid; grid-template-columns: 3fr 1fr; gap: 24px; }
+        .board-container { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(10px); padding: 24px; border-radius: 12px; }
+        .controls { display: flex; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .turn-indicator { padding: 12px 20px; border-radius: 8px; font-weight: bold; }
+        .turn-white { background: #eab308; color: #0f172a; }
+        .turn-black { background: #3b82f6; color: white; }
+        .new-game-btn { padding: 12px 20px; background: #16a34a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .new-game-btn:hover { background: #15803d; }
+        .board { display: inline-block; background: rgba(120, 53, 15, 0.5); padding: 12px; border-radius: 8px; max-width: 100%; }
+        .board-row { display: flex; }
+        .square { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; transition: all 0.2s; position: relative; }
+        .square:hover { filter: brightness(1.1); }
+        .light { background: #fed7aa; }
+        .dark { background: #b45309; }
+        .selected { box-shadow: inset 0 0 0 4px #eab308; }
+        
+        .piece { font-size: 48px; line-height: 1; pointer-events: none; }
+        .piece-btn .piece { font-size: 28px; }
+        .piece-white { 
+            color: transparent;
+            background: linear-gradient(145deg, #ffffff 0%, #f0f0f0 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000) drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+        }
+        .piece-black { 
+            color: transparent;
+            background: linear-gradient(145deg, #1a1a1a 0%, #000000 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            filter: drop-shadow(0 0 1px #888) drop-shadow(0 1px 2px rgba(255,255,255,0.3));
+        }
+        
+        .stacked-piece { position: relative; width: 100%; height: 100%; }
+        .stacked-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+        .stacked-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; z-index: 10; padding-top: 4px; }
+        .stacked-top { font-size: 24px; line-height: 1; margin-bottom: -2px; }
+        .stacked-bottom { font-size: 40px; line-height: 1; }
+        .triangle-left, .triangle-right { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 20; cursor: pointer; transition: all 0.2s; }
+        .triangle-left { clip-path: polygon(0% 100%, 50% 0%, 0% 0%); }
+        .triangle-right { clip-path: polygon(100% 100%, 50% 0%, 100% 0%); }
+        .triangle-left:hover { background: rgba(128, 0, 128, 0.2); }
+        .triangle-right:hover { background: rgba(0, 0, 255, 0.2); }
+        .triangle-left.selected { background: rgba(147, 51, 234, 0.6); }
+        .triangle-right.selected { background: rgba(59, 130, 246, 0.6); }
+        .triangle-bg-left, .triangle-bg-right { position: absolute; bottom: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+        .triangle-bg-left { left: 0; clip-path: polygon(0% 100%, 50% 0%, 0% 0%); }
+        .triangle-bg-right { right: 0; clip-path: polygon(100% 100%, 50% 0%, 100% 0%); }
+        .triangle-symbol { position: absolute; pointer-events: none; font-size: 20px; line-height: 1; }
+        .triangle-symbol.left { top: 2px; left: 2px; }
+        .triangle-symbol.right { top: 2px; right: 2px; }
+        .whole-selected { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); background: rgba(255, 215, 0, 0.5); }
+        .sidebar { display: flex; flex-direction: column; gap: 16px; }
+        .panel { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(10px); padding: 16px; border-radius: 12px; }
+        .panel h2 { font-size: 18px; margin-bottom: 12px; }
+        .move-history { max-height: 256px; overflow-y: auto; }
+        .move-pair { background: rgba(51, 65, 85, 0.5); padding: 8px 12px; border-radius: 4px; margin-bottom: 4px; font-size: 14px; display: grid; grid-template-columns: 40px 1fr 1fr; gap: 8px; align-items: center; }
+        .move-number { color: #94a3b8; font-weight: bold; }
+        .move-white { color: #f1f5f9; }
+        .move-black { color: #cbd5e1; }
+        .rules { background: linear-gradient(135deg, rgba(88, 28, 135, 0.8), rgba(29, 78, 216, 0.8)); }
+        .rules p { font-size: 14px; margin-bottom: 8px; }
+        .selected-info { display: none; }
+        .selected-info.show { display: block; }
+        .selected-pieces { display: flex; justify-content: center; gap: 8px; margin-bottom: 8px; }
+        .selected-piece-icon { font-size: 48px; }
+        .valid-move { position: absolute; width: 16px; height: 16px; background: #22c55e; border-radius: 50%; opacity: 0.6; pointer-events: none; }
+        .valid-capture { position: absolute; width: 56px; height: 56px; border: 4px solid #22c55e; border-radius: 50%; pointer-events: none; }
+        .valid-klik { position: absolute; width: 56px; height: 56px; border: 4px solid #3b82f6; border-radius: 50%; pointer-events: none; animation: pulse 1s infinite; }
+        .valid-unklik-klik { position: absolute; width: 56px; height: 56px; border: 4px solid #a855f7; border-radius: 50%; pointer-events: none; animation: pulse 1s infinite; }
+        .promotion-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .promotion-box { background: rgba(30, 41, 59, 0.95); padding: 24px; border-radius: 12px; border: 3px solid #eab308; }
+        .promotion-title { color: white; font-size: 20px; font-weight: bold; margin-bottom: 16px; text-align: center; }
+        .promotion-pieces { display: flex; gap: 12px; }
+        .promotion-choice { width: 80px; height: 80px; background: #fed7aa; border: 3px solid transparent; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+        .promotion-choice:hover { border-color: #3b82f6; transform: scale(1.1); }
+        .promotion-piece { font-size: 60px; }
+        .game-over-box { background: linear-gradient(145deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98)); padding: 40px; border-radius: 16px; border: 4px solid #eab308; text-align: center; max-width: 400px; }
+        .game-over-title { color: #eab308; font-size: 48px; font-weight: bold; margin-bottom: 16px; text-shadow: 0 0 20px rgba(234, 179, 8, 0.5); }
+        .game-over-message { color: white; font-size: 24px; margin-bottom: 24px; }
+        .game-over-btn { padding: 12px 32px; background: #16a34a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 18px; }
+        .game-over-btn:hover { background: #15803d; transform: scale(1.05); }
+        .check-indicator { position: absolute; top: 8px; right: 8px; background: #ef4444; color: white; padding: 4px 12px; border-radius: 6px; font-weight: bold; font-size: 14px; animation: checkPulse 1s infinite; }
+        @keyframes checkPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.05); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .auto-promote-toggle { margin-top: 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        
+        /* Position Editor Styles */
+        .editor-mode-indicator {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(245, 158, 11, 0.95);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+            z-index: 999;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .editor-mode-indicator.show { display: block; }
+        
+        .piece-palette {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        
+        .piece-btn {
+            padding: 8px;
+            font-size: 28px;
+            background: #f0d9b5;
+            border: 2px solid #b58863;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 48px;
+        }
+        
+        .piece-btn:hover {
+            background: #f5e4c7;
+            transform: scale(1.05);
+            border-color: #a07854;
+        }
+        
+        .piece-btn.selected {
+            border-color: #eab308;
+            background: #fed7aa;
+            box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.3);
+        }
+        
+        #eraserBtn.selected {
+            background: #dc2626;
+            border-color: #eab308;
+            box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.3);
+        }
+        
+        .editor-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .editor-btn {
+            padding: 8px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        
+        .editor-btn:hover { transform: translateY(-2px); }
+        .editor-btn-danger { background: #dc2626; color: white; }
+        .editor-btn-secondary { background: #6b7280; color: white; }
+        .editor-btn-primary { background: #16a34a; color: white; }
+        
+        .square.editor-highlight:hover {
+            box-shadow: inset 0 0 0 3px #22c55e;
+        }
+        
+        .editor-info {
+            background: rgba(59, 130, 246, 0.2);
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 3px solid #3b82f6;
+            font-size: 12px;
+            line-height: 1.5;
+            margin-top: 8px;
+        }
+        
+        .fen-input {
+            width: 100%;
+            padding: 8px;
+            background: rgba(30, 41, 59, 0.8);
+            border: 2px solid #475569;
+            border-radius: 6px;
+            color: white;
+            font-family: monospace;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+        
+        .fen-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        
+        .fen-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            margin-top: 4px;
+        }
+        
+        .fen-btn {
+            padding: 6px 4px;
+            font-size: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        
+        .fen-btn:hover {
+            transform: translateY(-1px);
+        }
+        
+        .fen-btn-copy {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .fen-btn-import {
+            background: #10b981;
+            color: white;
+        }
+        .auto-promote-toggle input { width: 18px; height: 18px; cursor: pointer; }
+        @media (max-width: 1024px) { 
+            .main-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 36px; }
+            .board-container { padding: 8px; }
+            .board { padding: 4px; width: 100%; max-width: 100%; }
+            .square { width: 12.5vw; height: 12.5vw; max-width: none; max-height: none; }
+            .piece { font-size: 10vw !important; }
+            .stacked-top { font-size: 5vw !important; }
+            .stacked-bottom { font-size: 8vw !important; }
+            .triangle-symbol { font-size: 4vw !important; }
+            .controls { justify-content: center; }
+            .turn-indicator, .new-game-btn { padding: 8px 16px; font-size: 14px; }
+        }
+        @media (max-width: 480px) {
+            body { padding: 5px; }
+            .header h1 { font-size: 28px; margin-bottom: 5px; }
+            .header p { font-size: 12px; }
+            .header { margin-bottom: 15px; }
+            .board-container { padding: 4px; }
+            .board { padding: 2px; }
+            .square { width: 11.5vw; height: 11.5vw; }
+            .piece { font-size: 9vw !important; }
+            .stacked-top { font-size: 4.5vw !important; }
+            .stacked-bottom { font-size: 7.5vw !important; }
+            .triangle-symbol { font-size: 3.5vw !important; }
+            .valid-move { width: 12px; height: 12px; }
+            .valid-capture, .valid-klik, .valid-unklik-klik { width: 9vw; height: 9vw; border-width: 2px; }
+            .panel { padding: 10px; }
+            .panel h2 { font-size: 14px; margin-bottom: 8px; }
+            .move-history { max-height: 150px; }
+            .move-pair { padding: 6px 8px; font-size: 12px; grid-template-columns: 35px 1fr 1fr; gap: 6px; }
+            .rules p { font-size: 12px; margin-bottom: 6px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👑 Klikschaak</h1>
+            <p>Combineer stukken voor strategische dominantie</p>
+        </div>
+        <div class="main-grid">
+            <div class="board-container">
+                <div class="controls">
+                    <div id="turnIndicator" class="turn-indicator turn-white">Wit aan zet</div>
+                    <button class="new-game-btn" onclick="initializeBoard()">🔄 Nieuw Spel</button>
+                    <button class="new-game-btn" style="background: #f59e0b;" onclick="toggleEditorMode()" id="editorToggleBtn">📝 Stelling Opzetten</button>
+                </div>
+                <div class="editor-mode-indicator" id="editorIndicator">
+                    📝 EDITOR MODUS - Klik stuk in palette, dan op bord
+                </div>
+                <div class="board" id="board"></div>
+            </div>
+            <div class="sidebar">
+                <div class="panel" id="moveHistoryPanel">
+                    <h2>📋 Zetten (<span id="moveCount">0</span>)</h2>
+                    <div class="move-history" id="moveHistory">
+                        <p style="color: #94a3b8; text-align: center; padding: 16px 0;">Nog geen zetten</p>
+                    </div>
+                </div>
+                <div class="panel rules">
+                    <h2>⚡ Spelregels</h2>
+                    <p><strong style="color: #c084fc;">Klikken:</strong> Selecteer stuk, klik op veld met blauwe ring</p>
+                    <p><strong style="color: #60a5fa;">Ontklikken:</strong> Klik op driehoek met het stuk</p>
+                    <p style="color: #fca5a5; font-weight: bold; margin-top: 8px;">⚠️ Koning mag NOOIT klikken!</p>
+                    <p style="color: #fbbf24; font-size: 12px; margin-top: 8px;">💡 Promotie: alleen met een pionzet!</p>
+                    <div class="auto-promote-toggle">
+                        <input type="checkbox" id="autoPromote" onchange="toggleAutoPromote()">
+                        <label for="autoPromote" style="color: #cbd5e1; cursor: pointer;">Automatisch promoveren tot dame</label>
+                    </div>
+                </div>
+                <div class="panel selected-info" id="selectedInfo">
+                    <h2>Geselecteerd</h2>
+                    <div class="selected-pieces" id="selectedPieces"></div>
+                    <p id="selectedNames" style="color: #cbd5e1; text-align: center; margin-bottom: 8px;"></p>
+                    <p id="selectedMoves" style="color: #94a3b8; font-size: 14px; text-align: center;"></p>
+                </div>
+                <div class="panel" id="editorPanel" style="display: none;">
+                    <h2>⚙️ Position Editor</h2>
+                    <div class="piece-palette" id="piecePalette">
+                        <div class="piece-btn" onclick="selectEditorPiece('K')"><span class="piece piece-white">♔</span></div>
+                        <div class="piece-btn" onclick="selectEditorPiece('Q')"><span class="piece piece-white">♕</span></div>
+                        <div class="piece-btn" onclick="selectEditorPiece('R')"><span class="piece piece-white">♖</span></div>
+                        <div class="piece-btn" onclick="selectEditorPiece('B')"><span class="piece piece-white">♗</span></div>
+                        <div class="piece-btn" onclick="selectEditorPiece('N')"><span class="piece piece-white">♘</span></div>
+                        <div class="piece-btn" onclick="selectEditorPiece('P')"><span class="piece piece-white">♙</span></div>
+                        <div class="piece-btn" onclick="selectEditorPiece('k')"><span class="piece piece-black">♚</span></div>
+                        <div class="piece-btn" onclick="selectEditorPiece('q')"><span class="piece piece-black">♛</span></div>
+                        <div class="piece-btn" onclick="selectEditorPiece('r')"><span class="piece piece-black">♜</span></div>
+                        <div class="piece-btn" onclick="selectEditorPiece('b')"><span class="piece piece-black">♝</span></div>
+                        <div class="piece-btn" onclick="selectEditorPiece('n')"><span class="piece piece-black">♞</span></div>
+                        <div class="piece-btn" onclick="selectEditorPiece('p')"><span class="piece piece-black">♟</span></div>
+                        <div class="piece-btn" style="background: #ef4444; border-color: #dc2626; color: white; font-weight: bold; font-size: 32px;" onclick="selectEraser()" id="eraserBtn">✖</div>
+                    </div>
+                    <div class="editor-actions">
+                        <button class="editor-btn editor-btn-danger" onclick="clearBoard()">🗑️ Bord Leegmaken</button>
+                        <button class="editor-btn editor-btn-secondary" onclick="resetToStart()">↩️ Startpositie</button>
+                        <button class="editor-btn editor-btn-primary" onclick="startFromPosition()">▶️ Spelen vanaf Positie</button>
+                    </div>
+                    <div class="editor-info" style="border-left-color: #eab308;">
+                        <strong>⏱️ Aan de beurt:</strong><br>
+                        <button class="editor-btn" id="turnToggleBtn" onclick="toggleEditorTurn()" style="margin-top: 4px; background: white; color: #1e293b;">
+                            <span id="turnToggleText">Wit</span>
+                        </button>
+                    </div>
+                    <div class="editor-info">
+                        <strong>💡 Tips:</strong><br>
+                        • Klik stuk → klik veld om te plaatsen<br>
+                        • Klik ✖ → klik veld om te verwijderen<br>
+                        • Rechtermuisknop = ook verwijderen<br>
+                        • Max 2 stukken per veld (zelfde kleur)<br>
+                        • ⚠️ Koning mag nooit klikken<br>
+                        • ⚠️ Pionnen niet op rij 1/8
+                    </div>
+                    <div class="editor-info" style="border-left-color: #10b981;">
+                        <strong>📋 FEN Export/Import:</strong><br>
+                        <input type="text" class="fen-input" id="fenInput" placeholder="FEN string...">
+                        <div class="fen-buttons">
+                            <button class="fen-btn fen-btn-copy" onclick="exportFEN()">📋 Kopieer FEN</button>
+                            <button class="fen-btn fen-btn-import" onclick="importFEN()">📥 Laad FEN</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const PS = {K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟',
+                    P0:'♙',P1:'♙',P2:'♙',P3:'♙',P4:'♙',P5:'♙',P6:'♙',P7:'♙',
+                    p0:'♟',p1:'♟',p2:'♟',p3:'♟',p4:'♟',p5:'♟',p6:'♟',p7:'♟'};
+        const PN = {K:'Koning',Q:'Dame',R:'Toren',B:'Loper',N:'Paard',P:'Pion',k:'koning',q:'dame',r:'toren',b:'loper',n:'paard',p:'pion',
+                    P0:'Pion',P1:'Pion',P2:'Pion',P3:'Pion',P4:'Pion',P5:'Pion',P6:'Pion',P7:'Pion',
+                    p0:'pion',p1:'pion',p2:'pion',p3:'pion',p4:'pion',p5:'pion',p6:'pion',p7:'pion'};
+        let board=[],selectedSquare=null,selectedUnklikPiece=null,validMoves=[],currentTurn='white',moveHistory=[],castlingRights={white:{kingSide:true,queenSide:true},black:{kingSide:true,queenSide:true}},enPassantTarget=null,autoPromoteToQueen=false,pendingPromotion=null,gameOver=false;
+        
+        // Position Editor variables
+        let isEditorMode = false;
+        let selectedEditorPiece = null;
+        let movedPawns=new Set();
+        
+        function initializeBoard(){
+            board=Array(8).fill(null).map(()=>Array(8).fill(null).map(()=>({pieces:[]})));
+            board[7][0].pieces=['R'];board[7][1].pieces=['N'];board[7][2].pieces=['B'];board[7][3].pieces=['Q'];board[7][4].pieces=['K'];board[7][5].pieces=['B'];board[7][6].pieces=['N'];board[7][7].pieces=['R'];
+            // Geef elke pion een uniek ID: P0 t/m P7 voor wit, p0 t/m p7 voor zwart
+            for(let i=0;i<8;i++)board[6][i].pieces=[`P${i}`];
+            board[0][0].pieces=['r'];board[0][1].pieces=['n'];board[0][2].pieces=['b'];board[0][3].pieces=['q'];board[0][4].pieces=['k'];board[0][5].pieces=['b'];board[0][6].pieces=['n'];board[0][7].pieces=['r'];
+            for(let i=0;i<8;i++)board[1][i].pieces=[`p${i}`];
+            currentTurn='white';moveHistory=[];selectedSquare=null;selectedUnklikPiece=null;validMoves=[];enPassantTarget=null;pendingPromotion=null;gameOver=false;
+            castlingRights={white:{kingSide:true,queenSide:true},black:{kingSide:true,queenSide:true}};
+            movedPawns=new Set();
+            const overlay=document.getElementById('gameOverOverlay');
+            if(overlay)overlay.remove();
+            renderBoard();updateUI();
+        }
+        
+        function toggleAutoPromote(){autoPromoteToQueen=document.getElementById('autoPromote').checked;}
+        function isWhitePiece(p){return p===p.toUpperCase();}
+        function isPawn(p){return p.charAt(0).charAt(0).toLowerCase()==='p';}
+        function getPieceValue(p){const v={q:5,r:4,b:3,n:2,p:1,k:6};return v[p.charAt(0).toLowerCase()]||0;}
+        
+        function coordToNotation(row,col){
+            const files='abcdefgh';
+            const ranks='87654321';
+            return files[col]+ranks[row];
+        }
+        
+        function piecesToNotation(pieces){
+            // Converteer stukken naar symbolen (gebruik PS mapping)
+            return pieces.map(p=>PS[p]).join('');
+        }
+        
+        function wouldBeInCheck(fromRow,fromCol,toRow,toCol,pieces,moveType,unklikIndex){
+            const testBoard=board.map(row=>row.map(sq=>({pieces:[...sq.pieces]})));
+            const isWhite=isWhitePiece(pieces[0]);
+            
+            if(moveType==='en-passant'){
+                const captureRow=isWhite?toRow+1:toRow-1;
+                testBoard[captureRow][toCol].pieces=[];
+                testBoard[toRow][toCol].pieces=[...pieces];
+                testBoard[fromRow][fromCol].pieces=[];
+            }else if(moveType==='en-passant-unklik'){
+                const captureRow=isWhite?toRow+1:toRow-1;
+                testBoard[captureRow][toCol].pieces=[];
+                const movingPiece=pieces[unklikIndex];
+                testBoard[toRow][toCol].pieces=[movingPiece];
+                testBoard[fromRow][fromCol].pieces=testBoard[fromRow][fromCol].pieces.filter((p,i)=>i!==unklikIndex);
+            }else if(moveType==='unklik'||moveType==='unklik-klik'){
+                const movingPiece=pieces[unklikIndex];
+                if(moveType==='unklik-klik'){
+                    testBoard[toRow][toCol].pieces=[...testBoard[toRow][toCol].pieces,movingPiece];
+                }else{
+                    testBoard[toRow][toCol].pieces=[movingPiece];
+                }
+                testBoard[fromRow][fromCol].pieces=testBoard[fromRow][fromCol].pieces.filter((p,i)=>i!==unklikIndex);
+            }else if(moveType==='klik'){
+                testBoard[toRow][toCol].pieces=[...testBoard[toRow][toCol].pieces,...pieces];
+                testBoard[fromRow][fromCol].pieces=[];
+            }else if(moveType==='castle-k'||moveType==='castle-q'||moveType==='castle-k-klik'||moveType==='castle-q-klik'||moveType==='castle-k-unklik-klik'||moveType==='castle-q-unklik-klik'||moveType==='castle-k-both'||moveType==='castle-q-both'){
+                const isKingSide=moveType.startsWith('castle-k');
+                const rookCol=isKingSide?7:0;
+                const newRookCol=isKingSide?5:3;
+                
+                // Koning verplaatsen
+                testBoard[toRow][toCol].pieces=pieces;
+                testBoard[fromRow][fromCol].pieces=[];
+                
+                const rookSquare=[...testBoard[fromRow][rookCol].pieces];
+                testBoard[fromRow][rookCol].pieces=[];
+                
+                if(moveType.includes('unklik-klik')){
+                    // Toren was geklikt, unklik en klik met stuk op doelveld
+                    const toren=rookSquare.find(p=>p.charAt(0).toLowerCase()==='r');
+                    const pieceOnTarget=[...testBoard[fromRow][newRookCol].pieces];
+                    testBoard[fromRow][newRookCol].pieces=[toren,...pieceOnTarget];
+                    // Andere stuk blijft op rookCol (maar rookCol is al leeg gemaakt)
+                } else if(moveType.includes('klik')){
+                    // Normale klik - toren klikt met stuk op doelveld
+                    const pieceOnSquare=[...testBoard[fromRow][newRookCol].pieces];
+                    testBoard[fromRow][newRookCol].pieces=[...rookSquare,...pieceOnSquare];
+                } else if(moveType.includes('both')){
+                    // Beide stukken (toren + geklikte stuk) verplaatsen
+                    testBoard[fromRow][newRookCol].pieces=rookSquare;
+                } else {
+                    // Normale rokade of alleen toren
+                    if(rookSquare.length===2){
+                        // Alleen toren verplaatsen (eerste stuk is altijd toren na sorting)
+                        const toren=rookSquare.find(p=>p.charAt(0).toLowerCase()==='r');
+                        testBoard[fromRow][newRookCol].pieces=[toren];
+                    } else {
+                        testBoard[fromRow][newRookCol].pieces=rookSquare;
+                    }
+                }
+                
+                const throughSquare=isKingSide?fromCol+1:fromCol-1;
+                for(let checkCol of[fromCol,throughSquare,toCol]){
+                    if(isSquareAttacked(testBoard,fromRow,checkCol,isWhite)){
+                        return true;
+                    }
+                }
+            }else{
+                testBoard[toRow][toCol].pieces=[...pieces];
+                testBoard[fromRow][fromCol].pieces=[];
+            }
+            
+            let kingRow=-1,kingCol=-1;
+            for(let r=0;r<8;r++){
+                for(let c=0;c<8;c++){
+                    if(testBoard[r][c].pieces.includes(isWhite?'K':'k')){
+                        kingRow=r;kingCol=c;break;
+                    }
+                }
+                if(kingRow!==-1)break;
+            }
+            if(kingRow===-1)return false;
+            return isSquareAttacked(testBoard,kingRow,kingCol,isWhite);
+        }
+        
+        function isSquareAttacked(testBoard,row,col,byWhite){
+            for(let r=0;r<8;r++){
+                for(let c=0;c<8;c++){
+                    const pieces=testBoard[r][c].pieces;
+                    if(pieces.length===0)continue;
+                    if(isWhitePiece(pieces[0])===byWhite)continue;
+                    for(let piece of pieces){
+                        if(canPieceAttack(testBoard,r,c,piece,row,col)){
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+        
+        function canPieceAttack(testBoard,fromRow,fromCol,piece,toRow,toCol){
+            const p=piece.toLowerCase();
+            const isWhite=isWhitePiece(piece);
+            if(p==='p'){
+                const dir=isWhite?-1:1;
+                return(Math.abs(fromCol-toCol)===1&&fromRow+dir===toRow);
+            }
+            if(p==='n'){
+                const dr=Math.abs(fromRow-toRow);
+                const dc=Math.abs(fromCol-toCol);
+                return(dr===2&&dc===1)||(dr===1&&dc===2);
+            }
+            if(p==='k'){
+                return Math.abs(fromRow-toRow)<=1&&Math.abs(fromCol-toCol)<=1;
+            }
+            if(p==='b'||p==='q'){
+                if(Math.abs(fromRow-toRow)===Math.abs(fromCol-toCol)){
+                    const dr=toRow>fromRow?1:-1;
+                    const dc=toCol>fromCol?1:-1;
+                    let r=fromRow+dr,c=fromCol+dc;
+                    while(r!==toRow||c!==toCol){
+                        if(testBoard[r][c].pieces.length>0)return false;
+                        r+=dr;c+=dc;
+                    }
+                    return true;
+                }
+            }
+            if(p==='r'||p==='q'){
+                if(fromRow===toRow||fromCol===toCol){
+                    const dr=fromRow===toRow?0:(toRow>fromRow?1:-1);
+                    const dc=fromCol===toCol?0:(toCol>fromCol?1:-1);
+                    let r=fromRow+dr,c=fromCol+dc;
+                    while(r!==toRow||c!==toCol){
+                        if(testBoard[r][c].pieces.length>0)return false;
+                        r+=dr;c+=dc;
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        function renderPiece(pieces,row,col,isSelected){
+            if(pieces.length===0)return'';
+            const getClass=p=>isWhitePiece(p)?'piece piece-white':'piece piece-black';
+            if(pieces.length===1)return`<div class="${getClass(pieces[0])}">${PS[pieces[0]]}</div>`;
+            const sorted=[...pieces].sort((a,b)=>getPieceValue(b)-getPieceValue(a));
+            const bottom=sorted[0],top=sorted[1];
+            const isWhite=isWhitePiece(pieces[0]);
+            const bottomSel=isSelected&&selectedUnklikPiece!==null&&pieces.indexOf(bottom)===selectedUnklikPiece;
+            const topSel=isSelected&&selectedUnklikPiece!==null&&pieces.indexOf(top)===selectedUnklikPiece;
+            const wholeSel=isSelected&&selectedUnklikPiece===null;
+            const canInt=isEditorMode||((isWhite&&currentTurn==='white')||(!isWhite&&currentTurn==='black'));
+            const clickHandler=isEditorMode?'handleEditorTriangleClick':'handleUnklikSelect';
+            const tooltipText=isEditorMode?'Verwijder':'Zet met';
+            return`<div class="stacked-piece"><svg class="stacked-svg" viewBox="0 0 64 64"><line x1="32" y1="0" x2="0" y2="64" stroke="rgba(100,100,100,0.4)" stroke-width="2"/><line x1="32" y1="0" x2="64" y2="64" stroke="rgba(100,100,100,0.4)" stroke-width="2"/></svg>${wholeSel?'<div class="whole-selected"></div>':''}<div class="stacked-center"><div class="stacked-top ${getClass(top)}">${PS[top]}</div><div class="stacked-bottom ${getClass(bottom)}">${PS[bottom]}</div></div>${canInt?`<div class="triangle-left ${bottomSel?'selected':''}" onclick="${clickHandler}(${row},${col},${pieces.indexOf(bottom)},event)" title="${tooltipText} ${PN[bottom]}"><span class="triangle-symbol left ${getClass(bottom)}">${PS[bottom]}</span></div><div class="triangle-right ${topSel?'selected':''}" onclick="${clickHandler}(${row},${col},${pieces.indexOf(top)},event)" title="${tooltipText} ${PN[top]}"><span class="triangle-symbol right ${getClass(top)}">${PS[top]}</span></div>`:''}${!bottomSel&&!wholeSel?'<div class="triangle-bg-left"></div>':''}${!topSel&&!wholeSel?'<div class="triangle-bg-right"></div>':''}</div>`;
+        }
+        
+        function renderBoard(){
+            const boardEl=document.getElementById('board');
+            boardEl.innerHTML='';
+            for(let row=0;row<8;row++){
+                const rowEl=document.createElement('div');
+                rowEl.className='board-row';
+                for(let col=0;col<8;col++){
+                    const square=document.createElement('div');
+                    const isLight=(row+col)%2===0;
+                    square.className=`square ${isLight?'light':'dark'}`;
+                    if(selectedSquare&&selectedSquare[0]===row&&selectedSquare[1]===col)square.classList.add('selected');
+                    const pieces=board[row][col].pieces;
+                    const isSel=selectedSquare&&selectedSquare[0]===row&&selectedSquare[1]===col;
+                    square.innerHTML=renderPiece(pieces,row,col,isSel);
+                    
+                    // Only show valid moves in play mode, not editor mode
+                    if (!isEditorMode) {
+                        const move=validMoves.find(([r,c])=>r===row&&c===col);
+                        if(move){
+                            const ind=document.createElement('div');
+                            if(move[2]==='klik')ind.className='valid-klik';
+                            else if(move[2]==='unklik-klik')ind.className='valid-unklik-klik';
+                            else if(pieces.length>0)ind.className='valid-capture';
+                            else ind.className='valid-move';
+                            square.appendChild(ind);
+                        }
+                    }
+                    square.onclick=(e)=>{
+                        if(!e.target.classList.contains('triangle-left')&&!e.target.classList.contains('triangle-right'))handleSquareClick(row,col);
+                    };
+                    
+                    // Right-click to remove pieces in editor mode
+                    square.oncontextmenu=(e)=>{
+                        e.preventDefault();
+                        if(isEditorMode){
+                            board[row][col].pieces=[];
+                            renderBoard();
+                        }
+                    };
+                    
+                    rowEl.appendChild(square);
+                }
+                boardEl.appendChild(rowEl);
+            }
+        }
+        
+        function handleSquareClick(row,col){
+            // Editor mode: place or remove pieces
+            if (isEditorMode) {
+                const square = board[row][col];
+                
+                if (selectedEditorPiece) {
+                    // Place piece
+                    const piece = selectedEditorPiece;
+                    
+                    // Remove existing kings of same color if placing a king
+                    if (piece.toLowerCase() === 'k') {
+                        const isWhiteKing = piece === 'K';
+                        for (let r = 0; r < 8; r++) {
+                            for (let c = 0; c < 8; c++) {
+                                board[r][c].pieces = board[r][c].pieces.filter(p => {
+                                    if (p.toLowerCase() !== 'k') return true;
+                                    // Keep if different color
+                                    return (p === 'K') !== isWhiteKing;
+                                });
+                            }
+                        }
+                    }
+                    
+                    // KONING MAG NOOIT KLIKKEN - check voor beide richtingen
+                    const isPlacingKing = piece.toLowerCase() === 'k';
+                    const hasKingOnSquare = square.pieces.some(p => p.toLowerCase() === 'k');
+                    
+                    // Als je een koning plaatst OF er staat al een koning → vervang alles
+                    if (isPlacingKing || hasKingOnSquare) {
+                        square.pieces = [piece];
+                        renderBoard();
+                        return;
+                    }
+                    
+                    // PIONNEN MOGEN NIET OP EERSTE OF ACHTSTE RIJ
+                    const isPlacingPawn = piece.toLowerCase() === 'p';
+                    if (isPlacingPawn && (row === 0 || row === 7)) {
+                        // Silently ignore - don't place pawn
+                        return;
+                    }
+                    
+                    // Check if square has pieces of opposite color
+                    const pieceIsWhite = piece === piece.toUpperCase();
+                    const hasOppositeColor = square.pieces.some(p => {
+                        const pIsWhite = p === p.toUpperCase();
+                        return pIsWhite !== pieceIsWhite;
+                    });
+                    
+                    // If opposite color, replace all pieces with new piece
+                    if (hasOppositeColor) {
+                        square.pieces = [piece];
+                    }
+                    // Add piece (max 2 per square, same color only)
+                    else if (square.pieces.length < 2) {
+                        square.pieces.push(piece);
+                    }
+                } else {
+                    // No piece selected = remove mode
+                    // Always clear the square, don't select it
+                    square.pieces = [];
+                }
+                
+                renderBoard();
+                return; // IMPORTANT: Don't continue to game mode logic
+            }
+            
+            // Normal game mode
+            if(gameOver)return;
+            const square=board[row][col];
+            if(selectedSquare){
+                const[selRow,selCol]=selectedSquare;
+                const move=validMoves.find(([r,c])=>r===row&&c===col);
+                if(move){
+                    const moveType=move[2];
+                    if(moveType==='castle-k'||moveType==='castle-q'||moveType==='castle-k-klik'||moveType==='castle-q-klik'||moveType==='castle-k-unklik-klik'||moveType==='castle-q-unklik-klik')executeCastling(selRow,selCol,row,col,moveType);
+                    else if(moveType==='castle-k-choice'||moveType==='castle-q-choice')showCastlingChoiceDialog(selRow,selCol,row,col,moveType);
+                    else if(moveType==='en-passant-choice')showEnPassantChoiceDialog(selRow,selCol,row,col);
+                    else movePiece(selRow,selCol,row,col,moveType);
+                }else{
+                    if(square.pieces.length>0&&isWhitePiece(square.pieces[0])===(currentTurn==='white')){
+                        selectedSquare=[row,col];
+                        selectedUnklikPiece=null;
+                        validMoves=getCombinedMoves(row,col,square.pieces);
+                    }else{
+                        selectedSquare=null;
+                        selectedUnklikPiece=null;
+                        validMoves=[];
+                    }
+                }
+            }else if(square.pieces.length>0){
+                const isWhite=isWhitePiece(square.pieces[0]);
+                if((isWhite&&currentTurn==='white')||(!isWhite&&currentTurn==='black')){
+                    selectedSquare=[row,col];
+                    selectedUnklikPiece=null;
+                    validMoves=getCombinedMoves(row,col,square.pieces);
+                }
+            }
+            renderBoard();updateSelectedInfo();
+        }
+        
+        
+        function handleEditorTriangleClick(row, col, pieceIndex, e) {
+            if (!isEditorMode) return;
+            e.stopPropagation();
+            
+            const square = board[row][col];
+            
+            // Remove the specific piece at pieceIndex
+            if (square.pieces.length > pieceIndex) {
+                square.pieces.splice(pieceIndex, 1);
+                renderBoard();
+            }
+        }
+        
+        function handleUnklikSelect(row,col,pieceIndex,e){
+            if(gameOver)return;
+            e.stopPropagation();
+            const square=board[row][col];
+            const selectedPiece=square.pieces[pieceIndex];
+            const isWhite=isWhitePiece(selectedPiece);
+            if((isWhite&&currentTurn!=='white')||(!isWhite&&currentTurn!=='black'))return;
+            selectedSquare=[row,col];
+            selectedUnklikPiece=pieceIndex;
+            
+            if(selectedPiece.charAt(0).toLowerCase()==='k'){
+                const kingMoves=getPieceMoves(row,col,selectedPiece);
+                validMoves=kingMoves.map(m=>[m[0],m[1],'unklik']).filter(move=>!wouldBeInCheck(row,col,move[0],move[1],square.pieces,'unklik',pieceIndex));
+                renderBoard();updateSelectedInfo();
+                return;
+            }
+            
+            const singleMoves=getPieceMoves(row,col,selectedPiece);
+            const movesKlik=[];
+            const isPawn=selectedPiece.charAt(0).toLowerCase()==='p';
+            
+            for(let move of singleMoves){
+                const[r,c,moveType]=move;
+                const targetSq=board[r][c];
+                
+                // REGEL: Pion mag nooit naar eigen achterste rij (zelfs bij unklik)
+                const isOwnBackRank=(isWhite&&r===7)||(!isWhite&&r===0);
+                if(isPawn&&isOwnBackRank){
+                    continue;
+                }
+                
+                if(moveType==='en-passant'){
+                    // En passant - alleen pion kan dit, en mag als unklik of als hele stapel
+                    movesKlik.push([r,c,'en-passant-unklik']);
+                }else if(targetSq.pieces.length===0||isWhitePiece(targetSq.pieces[0])!==isWhite){
+                    movesKlik.push([r,c,'unklik']);
+                }else if(targetSq.pieces.length<2&&isWhitePiece(targetSq.pieces[0])===isWhite&&!targetSq.pieces.some(p=>p.charAt(0).toLowerCase()==='k')){
+                    movesKlik.push([r,c,'unklik-klik']);
+                }
+            }
+            validMoves=movesKlik.filter(move=>!wouldBeInCheck(row,col,move[0],move[1],square.pieces,move[2],pieceIndex));
+            renderBoard();updateSelectedInfo();
+        }
+        
+        function getCombinedMoves(row,col,pieces){
+            const allMoves=new Map();
+            const isWhite=isWhitePiece(pieces[0]);
+            const canKlik=pieces.length===1;
+            const hasPawn=pieces.some(p=>p.charAt(0).toLowerCase()==='p');
+            
+            for(let piece of pieces){
+                const moves=getPieceMoves(row,col,piece);
+                moves.forEach(move=>{
+                    const[r,c,moveType]=move;
+                    const key=`${r},${c}`;
+                    const targetSq=board[r][c];
+                    const isPawnMove=piece.charAt(0).toLowerCase()==='p';
+                    const isPromotionRank=(isWhite&&r===0)||(!isWhite&&r===7);
+                    
+                    // REGEL: Een pion kan niet door een ander stuk naar de promotiërij gebracht worden
+                    if(hasPawn&&pieces.length===2&&!isPawnMove&&isPromotionRank){
+                        return;
+                    }
+                    
+                    // REGEL: Een pion (ook geklikt) mag nooit naar zijn eigen achterste rij
+                    const isOwnBackRank=(isWhite&&r===7)||(!isWhite&&r===0);
+                    if(hasPawn&&isOwnBackRank){
+                        return;
+                    }
+                    
+                    // EN PASSANT voor geklikte pionnen
+                    if(moveType==='en-passant'){
+                        const existingMove=allMoves.get(key);
+                        if(existingMove&&existingMove[2]!=='en-passant'){
+                            // Er is al een normale move naar dit veld (van het andere stuk)
+                            // Maak het een keuze tussen en passant en normale move
+                            allMoves.set(key,[r,c,'en-passant-choice']);
+                        }else{
+                            // Geen conflict, gewoon en passant
+                            allMoves.set(key,[r,c,'en-passant']);
+                        }
+                        return;
+                    }
+                    
+                    // Check of we een move willen toevoegen die conflicteert met en-passant
+                    const existingMove=allMoves.get(key);
+                    if(existingMove&&existingMove[2]==='en-passant'){
+                        // Er is al een en-passant move, maak het een keuze
+                        allMoves.set(key,[r,c,'en-passant-choice']);
+                        return;
+                    }
+                    
+                    if(!canKlik){
+                        if(targetSq.pieces.length===0||isWhitePiece(targetSq.pieces[0])!==isWhite)allMoves.set(key,move);
+                    }else{
+                        if(targetSq.pieces.length>0&&isWhitePiece(targetSq.pieces[0])===isWhite){
+                            const isPawn=piece.charAt(0).toLowerCase()==='p';
+                            const isStraight=isPawn&&col===c;
+                            if(isStraight&&targetSq.pieces.length<2&&!targetSq.pieces.some(p=>p.charAt(0).toLowerCase()==='k')&&!pieces.some(p=>p.charAt(0).toLowerCase()==='k'))allMoves.set(key,[r,c,'klik']);
+                            else if(!isPawn&&targetSq.pieces.length<2&&!targetSq.pieces.some(p=>p.charAt(0).toLowerCase()==='k')&&!pieces.some(p=>p.charAt(0).toLowerCase()==='k'))allMoves.set(key,[r,c,'klik']);
+                        }else if(targetSq.pieces.length===0||isWhitePiece(targetSq.pieces[0])!==isWhite)allMoves.set(key,move);
+                    }
+                });
+            }
+            
+            // SPECIALE PION KLIK MOVES: pion kan recht vooruit klikken met eigen stukken
+            if(canKlik){
+                const pion=pieces.find(p=>p.charAt(0).toLowerCase()==='p');
+                if(pion){
+                    const dir=isWhite?-1:1;
+                    const startRow=isWhite?6:1;
+                    const pawnId=pion; // Gebruik volledige pion ID
+                    
+                    // 1 veld vooruit
+                    if(row+dir>=0&&row+dir<8){
+                        const targetSq=board[row+dir][col];
+                        if(targetSq.pieces.length===1&&isWhitePiece(targetSq.pieces[0])===isWhite&&!targetSq.pieces.some(p=>p.charAt(0).toLowerCase()==='k')){
+                            const key=`${row+dir},${col}`;
+                            allMoves.set(key,[row+dir,col,'klik']);
+                        }
+                    }
+                    // 2 velden vooruit vanaf startpositie (alleen als pion nog nooit bewogen)
+                    if(row===startRow&&!movedPawns.has(pawnId)&&row+2*dir>=0&&row+2*dir<8){
+                        const targetSq=board[row+2*dir][col];
+                        const betweenSq=board[row+dir][col];
+                        if(betweenSq.pieces.length===0&&targetSq.pieces.length===1&&isWhitePiece(targetSq.pieces[0])===isWhite&&!targetSq.pieces.some(p=>p.charAt(0).toLowerCase()==='k')){
+                            const key=`${row+2*dir},${col}`;
+                            allMoves.set(key,[row+2*dir,col,'klik']);
+                        }
+                    }
+                }
+            }
+            
+            let finalMoves=Array.from(allMoves.values());
+            finalMoves=finalMoves.filter(move=>{
+                return!wouldBeInCheck(row,col,move[0],move[1],pieces,move[2],selectedUnklikPiece);
+            });
+            return finalMoves;
+        }
+        
+        function getPieceMoves(row,col,piece){
+            const moves=[];
+            const isWhite=isWhitePiece(piece);
+            const p=piece.charAt(0).toLowerCase(); // Gebruik eerste character voor type
+            
+            if(p==='p'){
+                const dir=isWhite?-1:1;
+                const startRow=isWhite?6:1;
+                const pawnId=piece; // Gebruik volledige piece ID (bijv. P0, p3)
+                
+                if(row+dir>=0&&row+dir<8&&board[row+dir][col].pieces.length===0){
+                    moves.push([row+dir,col]);
+                    // Dubbele zet alleen als pion op startrij EN nog nooit bewogen
+                    if(row===startRow&&!movedPawns.has(pawnId)&&board[row+2*dir][col].pieces.length===0){
+                        moves.push([row+2*dir,col]);
+                    }
+                }
+                for(let dc of[-1,1]){
+                    const newCol=col+dc;
+                    if(newCol>=0&&newCol<8&&row+dir>=0&&row+dir<8){
+                        const targetSq=board[row+dir][newCol];
+                        if(targetSq.pieces.length>0&&isWhitePiece(targetSq.pieces[0])!==isWhite)moves.push([row+dir,newCol]);
+                        if(enPassantTarget&&enPassantTarget[0]===row+dir&&enPassantTarget[1]===newCol)moves.push([row+dir,newCol,'en-passant']);
+                    }
+                }
+            }
+            
+            if(p==='n'){
+                const nm=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+                for(let[dr,dc]of nm){
+                    const newRow=row+dr,newCol=col+dc;
+                    if(newRow>=0&&newRow<8&&newCol>=0&&newCol<8)moves.push([newRow,newCol]);
+                }
+            }
+            
+            if(p==='b'||p==='q'){
+                const dirs=[[-1,-1],[-1,1],[1,-1],[1,1]];
+                for(let[dr,dc]of dirs){
+                    for(let i=1;i<8;i++){
+                        const newRow=row+dr*i,newCol=col+dc*i;
+                        if(newRow<0||newRow>=8||newCol<0||newCol>=8)break;
+                        moves.push([newRow,newCol]);
+                        if(board[newRow][newCol].pieces.length>0)break;
+                    }
+                }
+            }
+            
+            if(p==='r'||p==='q'){
+                const dirs=[[-1,0],[1,0],[0,-1],[0,1]];
+                for(let[dr,dc]of dirs){
+                    for(let i=1;i<8;i++){
+                        const newRow=row+dr*i,newCol=col+dc*i;
+                        if(newRow<0||newRow>=8||newCol<0||newCol>=8)break;
+                        moves.push([newRow,newCol]);
+                        if(board[newRow][newCol].pieces.length>0)break;
+                    }
+                }
+            }
+            
+            if(p==='k'){
+                const km=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+                for(let[dr,dc]of km){
+                    const newRow=row+dr,newCol=col+dc;
+                    if(newRow>=0&&newRow<8&&newCol>=0&&newCol<8){
+                        const targetSq=board[newRow][newCol];
+                        if(targetSq.pieces.length===0||isWhitePiece(targetSq.pieces[0])!==isWhite)moves.push([newRow,newCol]);
+                    }
+                }
+                const rights=isWhite?castlingRights.white:castlingRights.black;
+                const baseRow=isWhite?7:0;
+                
+                // KORTE ROKADE (kingside)
+                if(rights.kingSide) {
+                    const rookSquare = board[baseRow][7];
+                    const targetSquare = board[baseRow][5]; // f1/f8
+                    const kingDestSquare = board[baseRow][6]; // g1/g8
+                    
+                    // Path must be clear: f1/f8 en g1/g8
+                    if(kingDestSquare.pieces.length === 0) {
+                        // Check if rook square has pieces (toren kan geklikt zijn)
+                        if(rookSquare.pieces.length > 0 && rookSquare.pieces.some(p => p.toLowerCase() === 'r')) {
+                            if(targetSquare.pieces.length === 0) {
+                                // Scenario 1: f1/f8 is leeg
+                                if(rookSquare.pieces.length === 1) {
+                                    // Toren is alleen - normale rokade
+                                    moves.push([baseRow, 6, 'castle-k']);
+                                } else if(rookSquare.pieces.length === 2) {
+                                    // Toren is geklikt - keuze: alleen toren of beide
+                                    moves.push([baseRow, 6, 'castle-k-choice']);
+                                }
+                            } else if(targetSquare.pieces.length === 1 && isWhitePiece(targetSquare.pieces[0]) === isWhite) {
+                                // Scenario 2: f1/f8 heeft eigen stuk
+                                if(rookSquare.pieces.length === 1) {
+                                    // Toren alleen - klik met stuk op f1/f8
+                                    moves.push([baseRow, 6, 'castle-k-klik']);
+                                } else if(rookSquare.pieces.length === 2) {
+                                    // Toren geklikt - unklik en klik met stuk op f1/f8
+                                    moves.push([baseRow, 6, 'castle-k-unklik-klik']);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // LANGE ROKADE (queenside)
+                if(rights.queenSide) {
+                    const rookSquare = board[baseRow][0];
+                    const targetSquare = board[baseRow][3]; // d1/d8
+                    const kingDestSquare = board[baseRow][2]; // c1/c8
+                    const betweenSquare = board[baseRow][1]; // b1/b8
+                    
+                    // Path must be clear: b1/b8, c1/c8, en d1/d8
+                    if(kingDestSquare.pieces.length === 0 && betweenSquare.pieces.length === 0) {
+                        // Check if rook square has pieces (toren kan geklikt zijn)
+                        if(rookSquare.pieces.length > 0 && rookSquare.pieces.some(p => p.toLowerCase() === 'r')) {
+                            if(targetSquare.pieces.length === 0) {
+                                // Scenario 1: d1/d8 is leeg
+                                if(rookSquare.pieces.length === 1) {
+                                    // Toren is alleen - normale rokade
+                                    moves.push([baseRow, 2, 'castle-q']);
+                                } else if(rookSquare.pieces.length === 2) {
+                                    // Toren is geklikt - keuze: alleen toren of beide
+                                    moves.push([baseRow, 2, 'castle-q-choice']);
+                                }
+                            } else if(targetSquare.pieces.length === 1 && isWhitePiece(targetSquare.pieces[0]) === isWhite) {
+                                // Scenario 2: d1/d8 heeft eigen stuk
+                                if(rookSquare.pieces.length === 1) {
+                                    // Toren alleen - klik met stuk op d1/d8
+                                    moves.push([baseRow, 2, 'castle-q-klik']);
+                                } else if(rookSquare.pieces.length === 2) {
+                                    // Toren geklikt - unklik en klik met stuk op d1/d8
+                                    moves.push([baseRow, 2, 'castle-q-unklik-klik']);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return moves;
+        }
+        
+        function executeCastling(fromRow,fromCol,toRow,toCol,castleType){
+            const isKingSide=castleType.startsWith('castle-k');
+            const rookCol=isKingSide?7:0;
+            const newRookCol=isKingSide?5:3;
+            
+            // Koning verplaatsen
+            const kingPieces=board[fromRow][fromCol].pieces;
+            board[toRow][toCol].pieces=kingPieces;
+            board[fromRow][fromCol].pieces=[];
+            
+            // Toren ophalen
+            const rookSquare=[...board[fromRow][rookCol].pieces];
+            board[fromRow][rookCol].pieces=[];
+            
+            let notation = `O-O${isKingSide?'':'-O'}`;
+            
+            if(castleType.includes('unklik-klik')){
+                // Toren was geklikt, unklik en klik met stuk op doelveld
+                const toren=rookSquare.find(p=>p.charAt(0).toLowerCase()==='r');
+                const otherPiece=rookSquare.find(p=>p.toLowerCase()!=='r');
+                const pieceOnTarget=[...board[fromRow][newRookCol].pieces];
+                board[fromRow][newRookCol].pieces=[toren,...pieceOnTarget];
+                // Ander stuk blijft achter op rookCol
+                board[fromRow][rookCol].pieces=[otherPiece];
+                notation += ' (toren klikt)';
+            } else if(castleType.includes('klik')){
+                // Normale klik - toren klikt met stuk op doelveld
+                const pieceOnSquare=[...board[fromRow][newRookCol].pieces];
+                board[fromRow][newRookCol].pieces=[...rookSquare,...pieceOnSquare];
+                notation += ' klikt';
+            } else if(castleType.includes('both')){
+                // Beide stukken (toren + geklikte stuk) verplaatsen
+                board[fromRow][newRookCol].pieces=rookSquare;
+                notation += ' (beide)';
+            } else {
+                // Normale rokade of alleen toren
+                if(rookSquare.length===2){
+                    // Alleen toren verplaatsen, ander stuk blijft achter
+                    const toren=rookSquare.find(p=>p.charAt(0).toLowerCase()==='r');
+                    const otherPiece=rookSquare.find(p=>p.toLowerCase()!=='r');
+                    board[fromRow][newRookCol].pieces=[toren];
+                    board[fromRow][rookCol].pieces=[otherPiece];
+                    notation += ' (alleen toren)';
+                } else {
+                    // Normale rokade
+                    board[fromRow][newRookCol].pieces=rookSquare;
+                }
+            }
+            
+            if(currentTurn==='white')castlingRights.white={kingSide:false,queenSide:false};
+            else castlingRights.black={kingSide:false,queenSide:false};
+            selectedSquare=null;selectedUnklikPiece=null;validMoves=[];
+            currentTurn=currentTurn==='white'?'black':'white';
+            moveHistory.push({turn:currentTurn==='white'?'black':'white',notation:notation});
+            renderBoard();updateUI();checkForCheckmate();
+        }
+        
+        function movePiece(fromRow,fromCol,toRow,toCol,moveType){
+            const fromSq=board[fromRow][fromCol];
+            const toSq=board[toRow][toCol];
+            let piecesToMove,moveNotation='';
+            enPassantTarget=null;
+            
+            // Check of het een capture is (voor en passant validatie)
+            const isCapture=toSq.pieces.length>0;
+            
+            const fromNotation=coordToNotation(fromRow,fromCol);
+            const toNotation=coordToNotation(toRow,toCol);
+            
+            if(moveType==='unklik'||moveType==='unklik-klik'||moveType==='en-passant-unklik'){
+                // UNKLIK: één stuk losmaken van geklikte stapel
+                const movingPiece=fromSq.pieces[selectedUnklikPiece];
+                const otherPieces=fromSq.pieces.filter((p,i)=>i!==selectedUnklikPiece);
+                piecesToMove=[movingPiece];
+                fromSq.pieces=otherPieces;
+                moveNotation=`${PS[movingPiece]}${fromNotation}-${toNotation}`;
+                
+                // EN PASSANT UNKLIK
+                if(moveType==='en-passant-unklik'){
+                    const captureRow=currentTurn==='white'?toRow+1:toRow-1;
+                    board[captureRow][toCol].pieces=[];
+                    toSq.pieces=[movingPiece];
+                    moveNotation+=` x${coordToNotation(captureRow,toCol)} e.p.`;
+                    
+                    updateCastlingRights(fromRow,fromCol,toRow,toCol,piecesToMove);
+                    selectedSquare=null;selectedUnklikPiece=null;validMoves=[];
+                    currentTurn=currentTurn==='white'?'black':'white';
+                    moveHistory.push({turn:currentTurn==='white'?'black':'white',notation:moveNotation});
+                    renderBoard();updateUI();checkForCheckmate();
+                    return;
+                }
+                
+                const isPawnMove=movingPiece.charAt(0).toLowerCase()==='p';
+                const isPromotionRank=(isWhitePiece(movingPiece)&&toRow===0)||(!isWhitePiece(movingPiece)&&toRow===7);
+                
+                // PROMOTIE BIJ UNKLIK
+                if(isPawnMove&&isPromotionRank){
+                    if(moveType==='unklik-klik'){
+                        // Pion ontklikken + klikken op doelveld = pion promoveert, beide stukken blijven
+                        toSq.pieces=[...toSq.pieces,movingPiece];
+                        moveNotation+=' klikt';
+                    }else if(toSq.pieces.length>0){
+                        // Pion ontklikken en slaan = pion promoveert
+                        toSq.pieces=[movingPiece];
+                        moveNotation+=' x';
+                    }else{
+                        // Gewone unklik naar leeg veld = pion promoveert
+                        toSq.pieces=[movingPiece];
+                    }
+                    
+                    // Bij unklik-promotie: andere stukken komen NIET mee naar doelveld
+                    // Dit is de correcte interpretatie volgens de regels
+                    
+                    if(autoPromoteToQueen){
+                        const promoteTo=isWhitePiece(movingPiece)?'Q':'q';
+                        toSq.pieces=toSq.pieces.filter(p=>p.charAt(0).toLowerCase()!=='p');
+                        toSq.pieces.unshift(promoteTo);
+                        moveNotation+='='+PS[promoteTo];
+                        
+                        // Update castling rechten
+                        updateCastlingRights(fromRow,fromCol,toRow,toCol,toSq.pieces);
+                        
+                        selectedSquare=null;selectedUnklikPiece=null;validMoves=[];
+                        currentTurn=currentTurn==='white'?'black':'white';
+                        moveHistory.push({turn:currentTurn==='white'?'black':'white',notation:moveNotation});
+                        renderBoard();updateUI();checkForCheckmate();
+                    }else{
+                        pendingPromotion={
+                            row:toRow,
+                            col:toCol,
+                            isWhite:isWhitePiece(movingPiece),
+                            moveNotation:moveNotation,
+                            wasCapture:toSq.pieces.length>1||(moveType!=='unklik-klik'&&toSq.pieces.length>0)
+                        };
+                        showPromotionDialog();
+                    }
+                    return;
+                }
+                
+                // Normale unklik (geen promotie)
+                if(moveType==='unklik-klik'){
+                    toSq.pieces=[...toSq.pieces,movingPiece];
+                    moveNotation+=' klikt';
+                }else{
+                    if(toSq.pieces.length>0)moveNotation+=`x${toNotation}`;
+                    toSq.pieces=[movingPiece];
+                }
+                
+                updateCastlingRights(fromRow,fromCol,toRow,toCol,piecesToMove);
+                
+            }else if(moveType==='en-passant'){
+                piecesToMove=[...fromSq.pieces];
+                fromSq.pieces=[];
+                const captureRow=currentTurn==='white'?toRow+1:toRow-1;
+                board[captureRow][toCol].pieces=[];
+                toSq.pieces=piecesToMove;
+                moveNotation=`${piecesToNotation(piecesToMove)}${fromNotation}x${coordToNotation(captureRow,toCol)} e.p.`;
+                
+            }else{
+                // NORMALE MOVE OF KLIK
+                piecesToMove=[...fromSq.pieces];
+                fromSq.pieces=[];
+                moveNotation=`${piecesToNotation(piecesToMove)}${fromNotation}-${toNotation}`;
+                
+                const isPawnInStack=piecesToMove.some(p=>p.charAt(0).toLowerCase()==='p');
+                const isPromotionRank=(isWhitePiece(piecesToMove[0])&&toRow===0)||(!isWhitePiece(piecesToMove[0])&&toRow===7);
+                
+                // PROMOTIE BIJ GEKLIKTE STUKKEN
+                if(isPawnInStack&&isPromotionRank){
+                    // Bij geklikte stukken: pion promoveert, andere stuk komt MEE
+                    if(moveType==='klik'){
+                        toSq.pieces=[...toSq.pieces,...piecesToMove];
+                        moveNotation+=' klikt';
+                    }else{
+                        if(toSq.pieces.length>0)moveNotation+=' x';
+                        toSq.pieces=piecesToMove;
+                    }
+                    
+                    if(autoPromoteToQueen){
+                        const promoteTo=isWhitePiece(piecesToMove[0])?'Q':'q';
+                        // Vervang de pion door dame, houd andere stukken
+                        toSq.pieces=toSq.pieces.filter(p=>p.charAt(0).toLowerCase()!=='p');
+                        toSq.pieces.unshift(promoteTo);
+                        moveNotation+='='+PS[promoteTo];
+                        
+                        updateCastlingRights(fromRow,fromCol,toRow,toCol,toSq.pieces);
+                        
+                        selectedSquare=null;selectedUnklikPiece=null;validMoves=[];
+                        currentTurn=currentTurn==='white'?'black':'white';
+                        moveHistory.push({turn:currentTurn==='white'?'black':'white',notation:moveNotation});
+                        renderBoard();updateUI();checkForCheckmate();
+                    }else{
+                        pendingPromotion={
+                            row:toRow,
+                            col:toCol,
+                            isWhite:isWhitePiece(piecesToMove[0]),
+                            moveNotation:moveNotation,
+                            otherPieces:piecesToMove.filter(p=>p.charAt(0).toLowerCase()!=='p'),
+                            wasCapture:toSq.pieces.length>piecesToMove.length
+                        };
+                        showPromotionDialog();
+                    }
+                    return;
+                }
+                
+                // Normale move (geen promotie)
+                if(moveType==='klik'){
+                    toSq.pieces=[...toSq.pieces,...piecesToMove];
+                    moveNotation+=' klikt';
+                }else{
+                    if(toSq.pieces.length>0)moveNotation=`${piecesToNotation(piecesToMove)}${fromNotation}x${toNotation}`;
+                    toSq.pieces=piecesToMove;
+                }
+                
+                updateCastlingRights(fromRow,fromCol,toRow,toCol,piecesToMove);
+            }
+            
+            // En passant target - ALLEEN bij rechte dubbele pionzet vanaf startrij ZONDER slag
+            const hasPawn=piecesToMove.some(p=>p.charAt(0).toLowerCase()==='p');
+            const isStraightMove=(fromCol===toCol);
+            const isFromStartRank=(isWhitePiece(piecesToMove[0])&&fromRow===6)||(!isWhitePiece(piecesToMove[0])&&fromRow===1);
+            const isNotCapture=!isCapture; // Bij een capture heeft NIET de pion de zet gedaan
+            if(hasPawn&&isStraightMove&&isFromStartRank&&isNotCapture&&Math.abs(fromRow-toRow)===2){
+                // Dit is een dubbele pionzet vanaf startrij zonder slag - zet en passant target
+                const enPassantRow = (fromRow + toRow) / 2;
+                enPassantTarget=[enPassantRow, toCol];
+            }
+            
+            // Koning rokade rechten
+            if(piecesToMove.includes('K'))castlingRights.white={kingSide:false,queenSide:false};
+            else if(piecesToMove.includes('k'))castlingRights.black={kingSide:false,queenSide:false};
+            
+            // Track moved pawns - als een pion beweegt, markeer als bewogen
+            for(let piece of piecesToMove){
+                if(piece.charAt(0).toLowerCase()==='p'){
+                    movedPawns.add(piece); // Gebruik volledige piece ID (P0, p3, etc.)
+                }
+            }
+            
+            selectedSquare=null;selectedUnklikPiece=null;validMoves=[];
+            currentTurn=currentTurn==='white'?'black':'white';
+            moveHistory.push({turn:currentTurn==='white'?'black':'white',notation:moveNotation});
+            renderBoard();updateUI();checkForCheckmate();
+        }
+        
+        function updateCastlingRights(fromRow,fromCol,toRow,toCol,pieces){
+            // Check of toren verplaatst of geslagen wordt
+            if(toRow===7&&toCol===0&&pieces.includes('R'))castlingRights.white.queenSide=false;
+            if(toRow===7&&toCol===7&&pieces.includes('R'))castlingRights.white.kingSide=false;
+            if(toRow===0&&toCol===0&&pieces.includes('r'))castlingRights.black.queenSide=false;
+            if(toRow===0&&toCol===7&&pieces.includes('r'))castlingRights.black.kingSide=false;
+            
+            if(pieces.includes('R')&&fromRow===7&&fromCol===0)castlingRights.white.queenSide=false;
+            if(pieces.includes('R')&&fromRow===7&&fromCol===7)castlingRights.white.kingSide=false;
+            if(pieces.includes('r')&&fromRow===0&&fromCol===0)castlingRights.black.queenSide=false;
+            if(pieces.includes('r')&&fromRow===0&&fromCol===7)castlingRights.black.kingSide=false;
+        }
+        
+        function showPromotionDialog(){
+            const overlay=document.createElement('div');
+            overlay.className='promotion-overlay';
+            overlay.id='promotionOverlay';
+            const isWhite=pendingPromotion.isWhite;
+            const pieces=isWhite?['Q','R','B','N']:['q','r','b','n'];
+            const box=document.createElement('div');
+            box.className='promotion-box';
+            const title=document.createElement('div');
+            title.className='promotion-title';
+            title.textContent='Kies een stuk voor promotie:';
+            box.appendChild(title);
+            const piecesDiv=document.createElement('div');
+            piecesDiv.className='promotion-pieces';
+            pieces.forEach(p=>{
+                const choice=document.createElement('div');
+                choice.className='promotion-choice';
+                const pieceDiv=document.createElement('div');
+                pieceDiv.className=`promotion-piece piece ${isWhite?'piece-white':'piece-black'}`;
+                pieceDiv.textContent=PS[p];
+                choice.appendChild(pieceDiv);
+                choice.onclick=()=>executePromotion(p);
+                piecesDiv.appendChild(choice);
+            });
+            box.appendChild(piecesDiv);
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+        }
+        
+        function executePromotion(piece){
+            const {row,col,moveNotation,otherPieces}=pendingPromotion;
+            
+            // Vervang de pion door het gekozen stuk
+            const currentPieces=board[row][col].pieces;
+            const newPieces=currentPieces.filter(p=>p.charAt(0).toLowerCase()!=='p');
+            newPieces.unshift(piece);
+            
+            // Als er andere stukken waren (bij geklikte promotie), voeg die toe
+            if(otherPieces&&otherPieces.length>0){
+                // Andere stukken komen mee
+                board[row][col].pieces=newPieces;
+            }else{
+                board[row][col].pieces=newPieces;
+            }
+            
+            const overlay=document.getElementById('promotionOverlay');
+            if(overlay)overlay.remove();
+            
+            const finalNotation=moveNotation+'='+PS[piece];
+            
+            selectedSquare=null;selectedUnklikPiece=null;validMoves=[];
+            currentTurn=currentTurn==='white'?'black':'white';
+            moveHistory.push({turn:currentTurn==='white'?'black':'white',notation:finalNotation});
+            pendingPromotion=null;
+            renderBoard();updateUI();checkForCheckmate();
+        }
+        
+        function showCastlingChoiceDialog(fromRow,fromCol,toRow,toCol,castleType){
+            const overlay=document.createElement('div');
+            overlay.className='promotion-overlay';
+            overlay.id='castlingChoiceOverlay';
+            
+            const isKingSide=castleType.includes('k');
+            const rookCol=isKingSide?7:0;
+            const rookPieces=board[fromRow][rookCol].pieces;
+            const toren=rookPieces.find(p=>p.charAt(0).toLowerCase()==='r');
+            const otherPiece=rookPieces.find(p=>p.toLowerCase()!=='r');
+            const isWhite=isWhitePiece(toren);
+            
+            const box=document.createElement('div');
+            box.className='promotion-box';
+            
+            const title=document.createElement('div');
+            title.className='promotion-title';
+            title.textContent='Kies rokade optie:';
+            box.appendChild(title);
+            
+            const choicesDiv=document.createElement('div');
+            choicesDiv.className='promotion-pieces';
+            choicesDiv.style.gap='20px';
+            
+            // Optie 1: Alleen toren verplaatsen
+            const choice1=document.createElement('div');
+            choice1.className='promotion-choice';
+            choice1.style.width='120px';
+            choice1.style.height='100px';
+            choice1.style.flexDirection='column';
+            choice1.style.display='flex';
+            choice1.style.justifyContent='center';
+            choice1.style.alignItems='center';
+            const piece1=document.createElement('div');
+            piece1.className=`promotion-piece piece ${isWhite?'piece-white':'piece-black'}`;
+            piece1.textContent=PS[toren];
+            piece1.style.fontSize='48px';
+            choice1.appendChild(piece1);
+            const label1=document.createElement('div');
+            label1.textContent='Alleen toren';
+            label1.style.fontSize='12px';
+            label1.style.marginTop='5px';
+            label1.style.color='white';
+            choice1.appendChild(label1);
+            choice1.onclick=()=>{
+                document.getElementById('castlingChoiceOverlay').remove();
+                executeCastling(fromRow,fromCol,toRow,toCol,castleType.replace('-choice',''));
+            };
+            choicesDiv.appendChild(choice1);
+            
+            // Optie 2: Beide stukken verplaatsen
+            const choice2=document.createElement('div');
+            choice2.className='promotion-choice';
+            choice2.style.width='120px';
+            choice2.style.height='100px';
+            choice2.style.flexDirection='column';
+            choice2.style.display='flex';
+            choice2.style.justifyContent='center';
+            choice2.style.alignItems='center';
+            const pieces2=document.createElement('div');
+            pieces2.style.display='flex';
+            pieces2.style.gap='5px';
+            const piece2a=document.createElement('div');
+            piece2a.className=`piece ${isWhite?'piece-white':'piece-black'}`;
+            piece2a.textContent=PS[toren];
+            piece2a.style.fontSize='36px';
+            const piece2b=document.createElement('div');
+            piece2b.className=`piece ${isWhite?'piece-white':'piece-black'}`;
+            piece2b.textContent=PS[otherPiece];
+            piece2b.style.fontSize='36px';
+            pieces2.appendChild(piece2a);
+            pieces2.appendChild(piece2b);
+            choice2.appendChild(pieces2);
+            const label2=document.createElement('div');
+            label2.textContent='Beide stukken';
+            label2.style.fontSize='12px';
+            label2.style.marginTop='5px';
+            label2.style.color='white';
+            choice2.appendChild(label2);
+            choice2.onclick=()=>{
+                document.getElementById('castlingChoiceOverlay').remove();
+                executeCastling(fromRow,fromCol,toRow,toCol,castleType.replace('-choice','-both'));
+            };
+            choicesDiv.appendChild(choice2);
+            
+            box.appendChild(choicesDiv);
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+        }
+        
+        function showEnPassantChoiceDialog(fromRow,fromCol,toRow,toCol){
+            const overlay=document.createElement('div');
+            overlay.className='promotion-overlay';
+            overlay.id='enPassantChoiceOverlay';
+            
+            const pieces=board[fromRow][fromCol].pieces;
+            const isWhite=isWhitePiece(pieces[0]);
+            const pawn=pieces.find(p=>p.charAt(0).toLowerCase()==='p');
+            const otherPiece=pieces.find(p=>p.toLowerCase()!=='p');
+            
+            const box=document.createElement('div');
+            box.className='promotion-box';
+            
+            const title=document.createElement('div');
+            title.className='promotion-title';
+            title.textContent='Kies zet type:';
+            box.appendChild(title);
+            
+            const choicesDiv=document.createElement('div');
+            choicesDiv.className='promotion-pieces';
+            choicesDiv.style.gap='20px';
+            
+            // Optie 1: En passant (pion slaat)
+            const choice1=document.createElement('div');
+            choice1.className='promotion-choice';
+            choice1.style.width='140px';
+            choice1.style.height='110px';
+            choice1.style.flexDirection='column';
+            choice1.style.display='flex';
+            choice1.style.justifyContent='center';
+            choice1.style.alignItems='center';
+            const pieces1=document.createElement('div');
+            pieces1.style.display='flex';
+            pieces1.style.gap='5px';
+            const piece1a=document.createElement('div');
+            piece1a.className=`piece ${isWhite?'piece-white':'piece-black'}`;
+            piece1a.textContent=PS[pawn];
+            piece1a.style.fontSize='48px';
+            pieces1.appendChild(piece1a);
+            choice1.appendChild(pieces1);
+            const label1=document.createElement('div');
+            label1.textContent='En passant';
+            label1.style.fontSize='12px';
+            label1.style.marginTop='5px';
+            label1.style.color='white';
+            choice1.appendChild(label1);
+            const sublabel1=document.createElement('div');
+            sublabel1.textContent='(pion slaat)';
+            sublabel1.style.fontSize='10px';
+            sublabel1.style.color='#64748b';
+            choice1.appendChild(sublabel1);
+            choice1.onclick=()=>{
+                document.getElementById('enPassantChoiceOverlay').remove();
+                movePiece(fromRow,fromCol,toRow,toCol,'en-passant');
+            };
+            choicesDiv.appendChild(choice1);
+            
+            // Optie 2: Normale move (ander stuk beweegt)
+            const choice2=document.createElement('div');
+            choice2.className='promotion-choice';
+            choice2.style.width='140px';
+            choice2.style.height='110px';
+            choice2.style.flexDirection='column';
+            choice2.style.display='flex';
+            choice2.style.justifyContent='center';
+            choice2.style.alignItems='center';
+            const pieces2=document.createElement('div');
+            pieces2.style.display='flex';
+            pieces2.style.gap='5px';
+            const piece2a=document.createElement('div');
+            piece2a.className=`piece ${isWhite?'piece-white':'piece-black'}`;
+            piece2a.textContent=PS[otherPiece];
+            piece2a.style.fontSize='48px';
+            pieces2.appendChild(piece2a);
+            choice2.appendChild(pieces2);
+            const label2=document.createElement('div');
+            label2.textContent='Normale zet';
+            label2.style.fontSize='12px';
+            label2.style.marginTop='5px';
+            label2.style.color='white';
+            choice2.appendChild(label2);
+            const sublabel2=document.createElement('div');
+            sublabel2.textContent='('+PN[otherPiece]+' beweegt)';
+            sublabel2.style.fontSize='10px';
+            sublabel2.style.color='#64748b';
+            choice2.appendChild(sublabel2);
+            choice2.onclick=()=>{
+                document.getElementById('enPassantChoiceOverlay').remove();
+                movePiece(fromRow,fromCol,toRow,toCol,undefined);
+            };
+            choicesDiv.appendChild(choice2);
+            
+            box.appendChild(choicesDiv);
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+        }
+        
+        function isInCheck(color){
+            const isWhite=color==='white';
+            let kingRow=-1,kingCol=-1;
+            for(let r=0;r<8;r++){
+                for(let c=0;c<8;c++){
+                    if(board[r][c].pieces.includes(isWhite?'K':'k')){
+                        kingRow=r;kingCol=c;break;
+                    }
+                }
+                if(kingRow!==-1)break;
+            }
+            if(kingRow===-1)return false;
+            return isSquareAttacked(board,kingRow,kingCol,isWhite);
+        }
+        
+        function hasLegalMoves(color){
+            const isWhite=color==='white';
+            for(let r=0;r<8;r++){
+                for(let c=0;c<8;c++){
+                    const pieces=board[r][c].pieces;
+                    if(pieces.length===0)continue;
+                    if(isWhitePiece(pieces[0])!==(color==='white'))continue;
+                    const moves=getCombinedMoves(r,c,pieces);
+                    if(moves.length>0)return true;
+                    if(pieces.length===2){
+                        for(let i=0;i<2;i++){
+                            const piece=pieces[i];
+                            const singleMoves=getPieceMoves(r,c,piece);
+                            for(let move of singleMoves){
+                                const[mr,mc]=move;
+                                const targetSq=board[mr][mc];
+                                if(targetSq.pieces.length===0||isWhitePiece(targetSq.pieces[0])!==isWhite){
+                                    if(!wouldBeInCheck(r,c,mr,mc,pieces,'unklik',i))return true;
+                                }else if(targetSq.pieces.length<2&&isWhitePiece(targetSq.pieces[0])===isWhite&&!targetSq.pieces.some(p=>p.charAt(0).toLowerCase()==='k')){
+                                    if(!wouldBeInCheck(r,c,mr,mc,pieces,'unklik-klik',i))return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+        
+        function checkForCheckmate(){
+            const inCheck=isInCheck(currentTurn);
+            const hasLegal=hasLegalMoves(currentTurn);
+            if(!hasLegal){
+                gameOver=true;
+                if(inCheck){
+                    showGameOver('Schaakmat!',currentTurn==='white'?'Zwart':'Wit');
+                }else{
+                    showGameOver('Pat!','Remise');
+                }
+            }else if(inCheck){
+                showCheckIndicator();
+            }
+        }
+        
+        function showCheckIndicator(){
+            const indicator=document.getElementById('checkIndicator');
+            if(indicator)indicator.remove();
+            const newIndicator=document.createElement('div');
+            newIndicator.id='checkIndicator';
+            newIndicator.className='check-indicator';
+            newIndicator.textContent='SCHAAK!';
+            document.querySelector('.board-container').style.position='relative';
+            document.querySelector('.board-container').appendChild(newIndicator);
+            setTimeout(()=>{
+                if(document.getElementById('checkIndicator'))document.getElementById('checkIndicator').remove();
+            },3000);
+        }
+        
+        function showGameOver(title,winner){
+            const overlay=document.createElement('div');
+            overlay.className='promotion-overlay';
+            overlay.id='gameOverOverlay';
+            const box=document.createElement('div');
+            box.className='game-over-box';
+            const titleDiv=document.createElement('div');
+            titleDiv.className='game-over-title';
+            titleDiv.textContent=title;
+            box.appendChild(titleDiv);
+            const message=document.createElement('div');
+            message.className='game-over-message';
+            message.textContent=winner==='Remise'?'Het spel eindigt in remise':`${winner} wint!`;
+            box.appendChild(message);
+            const btn=document.createElement('button');
+            btn.className='game-over-btn';
+            btn.textContent='Nieuw Spel';
+            btn.onclick=()=>initializeBoard();
+            box.appendChild(btn);
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+        }
+        
+        function updateUI(){
+            const ind=document.getElementById('turnIndicator');
+            ind.textContent=currentTurn==='white'?'Wit aan zet':'Zwart aan zet';
+            ind.className=`turn-indicator ${currentTurn==='white'?'turn-white':'turn-black'}`;
+            document.getElementById('moveCount').textContent=Math.ceil(moveHistory.length/2);
+            const histEl=document.getElementById('moveHistory');
+            if(moveHistory.length===0){
+                histEl.innerHTML='<p style="color:#94a3b8;text-align:center;padding:16px 0;">Nog geen zetten</p>';
+            }else{
+                // Group moves into pairs (white, black)
+                const pairs=[];
+                for(let i=0;i<moveHistory.length;i+=2){
+                    const whiteMove=moveHistory[i];
+                    const blackMove=i+1<moveHistory.length?moveHistory[i+1]:null;
+                    pairs.push({
+                        moveNumber:Math.floor(i/2)+1,
+                        white:whiteMove,
+                        black:blackMove
+                    });
+                }
+                
+                // Show last 10 move pairs (20 moves)
+                histEl.innerHTML=pairs.slice(-10).reverse().map(pair=>{
+                    const whiteText=pair.white?pair.white.notation:'';
+                    const blackText=pair.black?pair.black.notation:'';
+                    return`<div class="move-pair">
+                        <span class="move-number">${pair.moveNumber}.</span>
+                        <span class="move-white">${whiteText}</span>
+                        <span class="move-black">${blackText}</span>
+                    </div>`;
+                }).join('');
+            }
+        }
+        
+        function updateSelectedInfo(){
+            const info=document.getElementById('selectedInfo');
+            if(selectedSquare&&board[selectedSquare[0]][selectedSquare[1]].pieces.length>0){
+                info.classList.add('show');
+                const pieces=board[selectedSquare[0]][selectedSquare[1]].pieces;
+                const getClass=p=>isWhitePiece(p)?'selected-piece-icon piece piece-white':'selected-piece-icon piece piece-black';
+                document.getElementById('selectedPieces').innerHTML=pieces.map(p=>`<div class="${getClass(p)}">${PS[p]}</div>`).join('');
+                document.getElementById('selectedNames').textContent=pieces.map(p=>PN[p]).join(' + ');
+                document.getElementById('selectedMoves').textContent=`${validMoves.length} mogelijke zetten`;
+            }else info.classList.remove('show');
+        }
+        
+        // === POSITION EDITOR FUNCTIONS ===
+        
+        function toggleEditorMode() {
+            isEditorMode = !isEditorMode;
+            const indicator = document.getElementById('editorIndicator');
+            const toggleBtn = document.getElementById('editorToggleBtn');
+            const editorPanel = document.getElementById('editorPanel');
+            const rulesPanel = document.querySelector('.rules');
+            const moveHistoryPanel = document.getElementById('moveHistoryPanel');
+            
+            if (isEditorMode) {
+                indicator.classList.add('show');
+                toggleBtn.innerHTML = '🎮 Terug naar Spelen';
+                toggleBtn.style.background = '#16a34a';
+                editorPanel.style.display = 'block';
+                if (rulesPanel) rulesPanel.style.display = 'none';
+                if (moveHistoryPanel) moveHistoryPanel.style.display = 'none';
+                
+                // Initialize turn button based on current turn
+                const turnBtn = document.getElementById('turnToggleBtn');
+                const turnText = document.getElementById('turnToggleText');
+                if (turnBtn && turnText) {
+                    if (currentTurn === 'white') {
+                        turnBtn.style.background = 'white';
+                        turnBtn.style.color = '#1e293b';
+                        turnText.textContent = 'Wit';
+                    } else {
+                        turnBtn.style.background = '#1e293b';
+                        turnBtn.style.color = 'white';
+                        turnText.textContent = 'Zwart';
+                    }
+                }
+                
+                // Deselect any selected square and clear valid moves
+                selectedSquare = null;
+                selectedUnklikPiece = null;
+                validMoves = [];
+                renderBoard();
+            } else {
+                indicator.classList.remove('show');
+                toggleBtn.innerHTML = '📝 Stelling Opzetten';
+                toggleBtn.style.background = '#f59e0b';
+                editorPanel.style.display = 'none';
+                if (rulesPanel) rulesPanel.style.display = 'block';
+                if (moveHistoryPanel) moveHistoryPanel.style.display = 'block';
+                selectedEditorPiece = null;
+                
+                // Clear selection highlighting
+                document.querySelectorAll('.piece-btn').forEach(btn => {
+                    btn.classList.remove('selected');
+                });
+            }
+        }
+        
+        function selectEditorPiece(piece) {
+            selectedEditorPiece = piece;
+            
+            // Update visual selection
+            document.querySelectorAll('.piece-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            
+            // Find and select clicked button by matching the Unicode symbol
+            const buttons = document.querySelectorAll('.piece-btn');
+            buttons.forEach(btn => {
+                if (btn.textContent.trim() === PS[piece]) {
+                    btn.classList.add('selected');
+                }
+            });
+        }
+        
+        function selectEraser() {
+            selectedEditorPiece = null; // null = eraser mode
+            
+            // Update visual selection
+            document.querySelectorAll('.piece-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            
+            // Select eraser button
+            document.getElementById('eraserBtn').classList.add('selected');
+        }
+        
+        function handleEditorTriangleClick(row, col, pieceIndex, e) {
+            e.stopPropagation(); // Prevent square click handler
+            
+            if (!isEditorMode) return;
+            
+            // Remove the specific piece from the stack
+            const square = board[row][col];
+            if (square.pieces.length > pieceIndex) {
+                square.pieces.splice(pieceIndex, 1);
+                renderBoard();
+            }
+        }
+        
+        function clearBoard() {
+            if (!isEditorMode) return;
+            if (confirm('Weet je zeker dat je het bord wilt leegmaken?')) {
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        board[row][col].pieces = [];
+                    }
+                }
+                renderBoard();
+            }
+        }
+        
+        function resetToStart() {
+            if (!isEditorMode) return;
+            if (confirm('Terugzetten naar startpositie?')) {
+                initializeBoard();
+                renderBoard();
+            }
+        }
+        
+        
+        function toggleEditorTurn() {
+            if (!isEditorMode) return;
+            
+            // Toggle turn
+            currentTurn = currentTurn === 'white' ? 'black' : 'white';
+            
+            // Update button UI
+            const btn = document.getElementById('turnToggleBtn');
+            const text = document.getElementById('turnToggleText');
+            
+            if (currentTurn === 'white') {
+                btn.style.background = 'white';
+                btn.style.color = '#1e293b';
+                text.textContent = 'Wit';
+            } else {
+                btn.style.background = '#1e293b';
+                btn.style.color = 'white';
+                text.textContent = 'Zwart';
+            }
+        }
+        
+        function startFromPosition() {
+            if (!isEditorMode) return;
+            
+            // Validate position has both kings
+            let whiteKing = false, blackKing = false;
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const pieces = board[row][col].pieces;
+                    if (pieces.includes('K')) whiteKing = true;
+                    if (pieces.includes('k')) blackKing = true;
+                }
+            }
+            
+            if (!whiteKing || !blackKing) {
+                alert('Positie moet beide koningen bevatten!');
+                return;
+            }
+            
+            // Switch to play mode
+            toggleEditorMode();
+            
+            // Reset game state (keep currentTurn from editor)
+            moveHistory = [];
+            gameOver = false;
+            selectedSquare = null;
+            selectedUnklikPiece = null;
+            
+            // Update UI based on current turn
+            const turnClass = currentTurn === 'white' ? 'turn-white' : 'turn-black';
+            const turnText = currentTurn === 'white' ? 'Wit aan zet' : 'Zwart aan zet';
+            document.getElementById('turnIndicator').className = 'turn-indicator ' + turnClass;
+            document.getElementById('turnIndicator').textContent = turnText;
+            document.getElementById('moveCount').textContent = '0';
+            document.getElementById('moveHistory').innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 16px 0;">Nog geen zetten</p>';
+            
+            renderBoard();
+            alert('Speel vanaf deze positie! 🎮');
+        }
+        
+        // === FEN EXPORT/IMPORT ===
+        
+        function exportFEN() {
+            if (!isEditorMode) return;
+            
+            let fen = '';
+            
+            console.log('=== EXPORT FEN START ===');
+            
+            // Build FEN string (row by row from rank 8 to rank 1)
+            for (let row = 0; row < 8; row++) {
+                let emptyCount = 0;
+                let rankStr = '';
+                
+                for (let col = 0; col < 8; col++) {
+                    const pieces = board[row][col].pieces;
+                    
+                    if (pieces.length === 0) {
+                        emptyCount++;
+                    } else {
+                        // Add empty count if any
+                        if (emptyCount > 0) {
+                            rankStr += emptyCount;
+                            emptyCount = 0;
+                        }
+                        
+                        // Add piece(s)
+                        if (pieces.length === 1) {
+                            rankStr += pieces[0];
+                        } else if (pieces.length === 2) {
+                            // Klikschaak notation: use parentheses for stacked pieces
+                            rankStr += '(' + pieces[0] + pieces[1] + ')';
+                        }
+                    }
+                }
+                
+                // Add remaining empty count
+                if (emptyCount > 0) {
+                    rankStr += emptyCount;
+                }
+                
+                console.log(`Rank ${row}: "${rankStr}"`);
+                fen += rankStr;
+                
+                // Add rank separator (except for last rank)
+                if (row < 7) {
+                    fen += '/';
+                }
+            }
+            
+            // Add turn indicator (current turn from editor)
+            fen += ' ' + (currentTurn === 'white' ? 'w' : 'b');
+            
+            console.log('Final FEN:', fen);
+            console.log('=== EXPORT FEN END ===');
+            
+            // Set in input and copy to clipboard
+            const fenInput = document.getElementById('fenInput');
+            fenInput.value = fen;
+            fenInput.select();
+            
+            try {
+                document.execCommand('copy');
+                alert('FEN gekopieerd naar clipboard! 📋\n\n' + fen);
+            } catch (err) {
+                alert('FEN string:\n\n' + fen + '\n\nKopieer handmatig!');
+            }
+        }
+        
+        function importFEN() {
+            if (!isEditorMode) return;
+            
+            const fenInput = document.getElementById('fenInput');
+            const fen = fenInput.value.trim();
+            
+            if (!fen) {
+                alert('Plak eerst een FEN string in het veld!');
+                return;
+            }
+            
+            try {
+                console.log('=== IMPORT FEN START ===');
+                console.log('Input FEN:', fen);
+                
+                // Clear board first
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        board[row][col].pieces = [];
+                    }
+                }
+                
+                // Parse FEN (only board part, ignore turn/castling/etc)
+                const fenParts = fen.split(' ');
+                const boardFen = fenParts[0];
+                const ranks = boardFen.split('/');
+                
+                console.log('Ranks:', ranks);
+                
+                if (ranks.length !== 8) {
+                    throw new Error('FEN moet 8 rijen hebben (heeft ' + ranks.length + ')');
+                }
+                
+                // Process each rank
+                for (let row = 0; row < 8; row++) {
+                    const rank = ranks[row];
+                    let col = 0;
+                    let i = 0;
+                    
+                    console.log(`Processing rank ${row}: "${rank}"`);
+                    
+                    while (i < rank.length && col < 8) {
+                        const char = rank[i];
+                        
+                        // Check for stacked pieces (Klikschaak notation)
+                        if (char === '(') {
+                            // Find closing parenthesis
+                            const closeIdx = rank.indexOf(')', i);
+                            if (closeIdx === -1) {
+                                throw new Error('Ongeldige Klikschaak notatie: geen sluithaakje');
+                            }
+                            
+                            // Extract pieces
+                            const stackedPieces = rank.substring(i + 1, closeIdx);
+                            console.log(`  Col ${col}: Stacked pieces (${stackedPieces})`);
+                            
+                            for (let p of stackedPieces) {
+                                if (isValidPiece(p)) {
+                                    // Skip pawns on first/last rank
+                                    if (p.toLowerCase() === 'p' && (row === 0 || row === 7)) {
+                                        console.warn(`  Skipping pawn on invalid rank ${row}`);
+                                        continue;
+                                    }
+                                    board[row][col].pieces.push(p);
+                                } else {
+                                    console.warn(`  Invalid piece in stack: ${p}`);
+                                }
+                            }
+                            
+                            col++;
+                            i = closeIdx + 1;
+                        }
+                        // Empty squares
+                        else if (char >= '1' && char <= '8') {
+                            const skipCount = parseInt(char);
+                            console.log(`  Col ${col}: Skip ${skipCount} empty squares`);
+                            col += skipCount;
+                            i++;
+                        }
+                        // Single piece
+                        else if (isValidPiece(char)) {
+                            console.log(`  Col ${col}: Single piece ${char}`);
+                            // Skip pawns on first/last rank
+                            if (char.toLowerCase() === 'p' && (row === 0 || row === 7)) {
+                                console.warn(`  Skipping pawn on invalid rank ${row}`);
+                            } else {
+                                board[row][col].pieces.push(char);
+                            }
+                            col++;
+                            i++;
+                        }
+                        else {
+                            console.warn(`  Skipping unknown character: ${char}`);
+                            i++; // Skip unknown characters
+                        }
+                    }
+                    
+                    if (col !== 8) {
+                        console.warn(`  Warning: Rank ${row} ended at col ${col} instead of 8`);
+                    }
+                }
+                
+                console.log('=== IMPORT FEN END ===');
+                
+                // Parse turn indicator if present
+                if (fenParts.length > 1) {
+                    const turnChar = fenParts[1].toLowerCase();
+                    if (turnChar === 'w' || turnChar === 'b') {
+                        currentTurn = turnChar === 'w' ? 'white' : 'black';
+                        
+                        // Update turn button
+                        const btn = document.getElementById('turnToggleBtn');
+                        const text = document.getElementById('turnToggleText');
+                        if (btn && text) {
+                            if (currentTurn === 'white') {
+                                btn.style.background = 'white';
+                                btn.style.color = '#1e293b';
+                                text.textContent = 'Wit';
+                            } else {
+                                btn.style.background = '#1e293b';
+                                btn.style.color = 'white';
+                                text.textContent = 'Zwart';
+                            }
+                        }
+                        console.log('Turn set to:', currentTurn);
+                    }
+                }
+                
+                renderBoard();
+                alert('FEN succesvol geladen! ✅');
+                
+            } catch (error) {
+                console.error('FEN import error:', error);
+                alert('Fout bij laden FEN: ' + error.message);
+            }
+        }
+        
+        function isValidPiece(char) {
+            return 'KQRBNPkqrbnp'.includes(char);
+        }
+        
+        initializeBoard();
+    </script>
+</body>
+</html>

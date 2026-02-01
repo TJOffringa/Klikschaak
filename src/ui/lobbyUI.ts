@@ -1,4 +1,4 @@
-import { setOnUsersUpdate, LobbyUser, getOnlineUsers } from '../multiplayer/lobby.js';
+import { setOnUsersUpdate, LobbyUser } from '../multiplayer/lobby.js';
 import {
   createGame,
   joinGame,
@@ -14,11 +14,9 @@ import {
 import { getCurrentUser } from '../multiplayer/auth.js';
 import { renderBoard, updateUI } from './render.js';
 import * as state from '../game/state.js';
-import { getTranslation, getCurrentLanguage } from '../i18n/translations.js';
 
 let lobbyContainer: HTMLElement | null = null;
 let gameCodeDisplay: HTMLElement | null = null;
-let onlineIndicator: HTMLElement | null = null;
 let timerDisplay: HTMLElement | null = null;
 
 export function showLobbyUI(): void {

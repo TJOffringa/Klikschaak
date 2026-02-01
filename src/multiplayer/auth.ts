@@ -13,11 +13,6 @@ export interface User {
   };
 }
 
-interface AuthResponse {
-  user: User;
-  token: string;
-}
-
 // State
 let currentUser: User | null = null;
 
