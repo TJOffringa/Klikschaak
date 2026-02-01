@@ -323,13 +323,10 @@ function handleTouchMove(e: TouchEvent): void {
   if (!touchState.from) return;
   if (e.touches.length !== 1) return;
 
+  // Prevent scrolling immediately when a piece is touched
+  e.preventDefault();
+
   const touch = e.touches[0];
-
-  // Prevent scrolling when dragging
-  if (touchState.hasMoved || touchState.dragging) {
-    e.preventDefault();
-  }
-
   moveDrag(touch.clientX, touch.clientY);
 }
 
