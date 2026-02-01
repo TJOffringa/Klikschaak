@@ -698,3 +698,106 @@ body {
     font-size: 16px;
   }
 }
+
+/* ==========================================
+   DRAG AND DROP
+   ========================================== */
+
+/* Ghost piece that follows cursor/finger */
+.drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  font-size: 48px;
+  opacity: 0.85;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.drag-ghost .piece {
+  font-size: inherit;
+}
+
+/* Source square while dragging */
+.square.dragging {
+  opacity: 0.4;
+}
+
+/* Valid move target during drag */
+.square.drag-valid-target::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 30%;
+  height: 30%;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.5);
+  pointer-events: none;
+}
+
+/* Capture target during drag */
+.square.drag-capture-target::after {
+  width: 85%;
+  height: 85%;
+  border: 4px solid rgba(239, 68, 68, 0.6);
+  border-radius: 50%;
+  background: transparent;
+}
+
+/* Klik target during drag */
+.square.drag-klik-target::after {
+  width: 85%;
+  height: 85%;
+  border: 4px solid rgba(59, 130, 246, 0.7);
+  border-radius: 50%;
+  background: transparent;
+  animation: pulse 1s infinite;
+}
+
+/* Square under cursor/finger */
+.square.drag-over {
+  background: rgba(34, 197, 94, 0.35) !important;
+  transform: scale(1.02);
+  transition: transform 0.1s ease-out, background 0.1s ease-out;
+}
+
+/* Smooth piece placement animation */
+@keyframes pieceDrop {
+  0% {
+    transform: scale(1.15);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.piece-dropped {
+  animation: pieceDrop 0.15s ease-out;
+}
+
+/* Mobile: prevent text selection during drag */
+.board {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Mobile: larger touch targets */
+@media (max-width: 1024px) {
+  .drag-ghost {
+    font-size: 12vw;
+  }
+}
+
+@media (max-width: 480px) {
+  .drag-ghost {
+    font-size: 10vw;
+  }
+}

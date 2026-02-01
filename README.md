@@ -460,12 +460,6 @@ klikschaak/
   - Visual feedback tijdens drag (ghost piece, target highlighting)
   - Smooth animations (piece placement, capture)
   - Fallback naar click-click (blijft werken)
-- **⚡ Premove systeem**
-  - Queue moves tijdens opponent's beurt
-  - Visual indicator (premove arrow/highlight)
-  - Cancel premove (right-click / long-press)
-  - Execute immediately when turn starts
-  - Works met drag-and-drop én click-click
 - Backend setup start
   - Express server basis
   - Socket.io verbinding
@@ -477,17 +471,22 @@ klikschaak/
 - **Online lobby** (zie wie online is)
 - Friend code systeem (speel met bekenden)
 - Real-time game synchronisatie
-  - Move sync (incl. premoves)
+  - Move sync
   - Timer sync
   - Drag position sync (zie opponent's piece bewegen)
 - Spectator mode (optioneel)
 
-**Week 4:** Polish - accounts, rating, replay
+**Week 4:** Polish - accounts, rating, premoves
 - Basic stats (wins/losses/draws)
-- Game history (with premove playback)
+- Game history
 - Profile pages
 - Bug fixes & optimization
 - Mobile gesture improvements
+- **⚡ Premove systeem** (optioneel)
+  - Queue moves tijdens opponent's beurt
+  - Visual indicator (premove arrow/highlight)
+  - Cancel premove (right-click / long-press)
+  - Execute immediately when turn starts
 
 ## 🏗️ Product Roadmap & Architecture
 
@@ -1719,15 +1718,14 @@ volgens src/ structuur."
 
 ---
 
-**STATUS**: ✅ Week 1 KLAAR - Ready for Week 2!  
-**Laatst bijgewerkt**: 31 januari 2026  
-**Versie**: 2.0-dev (TypeScript modules)  
-**Volgende stap**: Drag-and-drop + Premoves  
+**STATUS**: ✅ Week 1 KLAAR - Ready for Week 2!
+**Laatst bijgewerkt**: 31 januari 2026
+**Versie**: 2.0-dev (TypeScript modules)
+**Volgende stap**: Drag-and-drop
 
-📋 **WEEK 2 FEATURES:**  
-🖱️ Drag-and-drop (desktop + mobile)  
-⚡ Premove systeem (queue moves)  
-🎨 Visual feedback (arrows, highlights)  
+📋 **WEEK 2 FEATURES:**
+🖱️ Drag-and-drop (desktop + mobile)
+🎨 Visual feedback (ghost piece, highlights)  
 
 ---
 

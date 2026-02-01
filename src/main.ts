@@ -1,6 +1,8 @@
+import './styles/main.css';
 import { initLanguage } from './i18n/translations';
 import { initGame } from './game/actions';
 import { renderBoard, updateUI } from './ui/render';
+import { initDragAndDrop } from './ui/dragdrop';
 
 // Initialize language from localStorage or browser settings
 initLanguage();
@@ -8,6 +10,7 @@ initLanguage();
 // Initialize game on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   initGame();
+  initDragAndDrop();
   updateStaticTexts();
 });
 

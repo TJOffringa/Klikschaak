@@ -120,6 +120,8 @@ export function renderBoard(): void {
       const square = document.createElement('div');
       const isLight = (row + col) % 2 === 0;
       square.className = `square ${isLight ? 'light' : 'dark'}`;
+      square.dataset.row = String(row);
+      square.dataset.col = String(col);
 
       if (selectedSquare && selectedSquare[0] === row && selectedSquare[1] === col) {
         square.classList.add('selected');
