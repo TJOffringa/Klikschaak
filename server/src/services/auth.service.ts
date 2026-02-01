@@ -35,8 +35,7 @@ function generateFriendCode(): string {
 export async function registerUser(
   username: string,
   email: string,
-  password: string,
-  inviteCode: string
+  password: string
 ): Promise<AuthResult> {
   if (!supabase) {
     return { success: false, error: 'Database not configured' };
@@ -54,22 +53,6 @@ export async function registerUser(
   }
 
   try {
-    // Verify invite code
-    const { data: inviteData, error: inviteError } = await supabase
-      .from('invite_codes')
-      .select('*')
-      .eq('code', inviteCode.toUpperCase())
-      .eq('active', true)
-      .single();
-
-    if (inviteError || !inviteData) {
-      return { success: false, error: 'Invalid or expired invite code' };
-    }
-
-    if (inviteData.used_count >= inviteData.max_uses) {
-      return { success: false, error: 'Invite code has reached maximum uses' };
-    }
-
     // Check if username or email already exists
     const { data: existingUser } = await supabase
       .from('users')
@@ -115,12 +98,6 @@ export async function registerUser(
       console.error('Error creating user:', createError);
       return { success: false, error: 'Failed to create account' };
     }
-
-    // Increment invite code usage
-    await supabase
-      .from('invite_codes')
-      .update({ used_count: inviteData.used_count + 1 })
-      .eq('id', inviteData.id);
 
     // Generate JWT
     const token = jwt.sign(

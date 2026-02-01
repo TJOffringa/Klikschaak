@@ -11,7 +11,10 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nbuild: add production build for GitHub Pages\n\n- Build TypeScript to bundled JS/CSS for static hosting\n- Move dev index.html to index.dev.html\n- Add compiled assets/ folder with hashed filenames\n- Update README with Week 2 roadmap \\(drag-drop, premoves\\)\n\nGitHub Pages now serves the production build at /index.html\nDevelopment version available at /index.dev.html \\(requires Vite\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git commit:*)",
       "Bash(timeout 10 npm run dev:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(npm run deploy:*)",
+      "Bash(git fetch:*)"
     ]
   }
 }

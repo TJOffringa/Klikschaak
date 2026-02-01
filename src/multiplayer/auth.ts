@@ -54,14 +54,13 @@ export function clearAuth(): void {
 export async function register(
   username: string,
   email: string,
-  password: string,
-  inviteCode: string
+  password: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const response = await fetch(`${SERVER_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, password, inviteCode }),
+      body: JSON.stringify({ username, email, password }),
     });
 
     const data = await response.json();

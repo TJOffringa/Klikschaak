@@ -90,7 +90,6 @@ function showRegisterForm(): void {
     <div class="auth-form">
       <h3>Register</h3>
       <form id="registerForm">
-        <input type="text" id="regInviteCode" placeholder="Invite Code" required>
         <input type="text" id="regUsername" placeholder="Username" required minlength="3" maxlength="32">
         <input type="email" id="regEmail" placeholder="Email" required>
         <input type="password" id="regPassword" placeholder="Password" required minlength="6">
@@ -127,13 +126,12 @@ async function handleLogin(e: Event): Promise<void> {
 async function handleRegister(e: Event): Promise<void> {
   e.preventDefault();
 
-  const inviteCode = (document.getElementById('regInviteCode') as HTMLInputElement).value;
   const username = (document.getElementById('regUsername') as HTMLInputElement).value;
   const email = (document.getElementById('regEmail') as HTMLInputElement).value;
   const password = (document.getElementById('regPassword') as HTMLInputElement).value;
   const errorEl = document.getElementById('registerError');
 
-  const result = await register(username, email, password, inviteCode);
+  const result = await register(username, email, password);
 
   if (result.success) {
     showUserStatus();

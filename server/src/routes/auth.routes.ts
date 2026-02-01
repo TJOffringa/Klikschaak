@@ -6,14 +6,14 @@ const router = Router();
 
 // POST /api/auth/register
 router.post('/register', async (req: Request, res: Response) => {
-  const { username, email, password, inviteCode } = req.body;
+  const { username, email, password } = req.body;
 
-  if (!username || !email || !password || !inviteCode) {
+  if (!username || !email || !password) {
     res.status(400).json({ error: 'Missing required fields' });
     return;
   }
 
-  const result = await registerUser(username, email, password, inviteCode);
+  const result = await registerUser(username, email, password);
 
   if (result.success) {
     res.status(201).json({
