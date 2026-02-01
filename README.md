@@ -476,17 +476,22 @@ klikschaak/
   - Drag position sync (zie opponent's piece bewegen)
 - Spectator mode (optioneel)
 
-**Week 4:** Polish - accounts, rating, premoves
-- Basic stats (wins/losses/draws)
-- Game history
-- Profile pages
-- Bug fixes & optimization
-- Mobile gesture improvements
+**Week 4:** Polish - PGN/FEN, board editor, premoves
+- **📄 PGN Systeem**
+  - Partij opslaan als PGN bestand
+  - PGN bestand inladen
+  - Partij naspelen (stap voor stap door zetten)
+- **🎨 Board Editor** ✅ (klikschaak-met-board-editor.html)
+  - Stukken plaatsen/verwijderen
+  - FEN positie laden ✅ (getest en werkend)
+  - Positie exporteren
 - **⚡ Premove systeem** (optioneel)
   - Queue moves tijdens opponent's beurt
   - Visual indicator (premove arrow/highlight)
   - Cancel premove (right-click / long-press)
   - Execute immediately when turn starts
+- Bug fixes & optimization
+- Mobile gesture improvements
 
 ## 🏗️ Product Roadmap & Architecture
 
