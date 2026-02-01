@@ -7,9 +7,10 @@
     "dev": "vite",
     "dev:server": "cd server && npm run dev",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && node -e \"require('fs').copyFileSync('dist/index.dev.html','dist/index.html')\"",
     "build:server": "cd server && npm run build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "npm run build && gh-pages -d dist"
   },
   "repository": {
     "type": "git",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
+    "gh-pages": "^6.3.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
   }
