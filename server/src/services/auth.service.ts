@@ -208,7 +208,8 @@ export async function getUserById(userId: string): Promise<DbUser | null> {
 
 export async function updateUserStats(
   userId: string,
-  result: 'win' | 'loss' | 'draw'
+  result: 'win' | 'loss' | 'draw',
+  playedAs?: 'white' | 'black'
 ): Promise<void> {
   if (!supabase) return;
 
@@ -216,10 +217,20 @@ export async function updateUserStats(
     const user = await getUserById(userId);
     if (!user) return;
 
-    const stats = { ...user.stats };
+    const stats = {
+      wins: user.stats.wins || 0,
+      losses: user.stats.losses || 0,
+      draws: user.stats.draws || 0,
+      gamesAsWhite: user.stats.gamesAsWhite || 0,
+      gamesAsBlack: user.stats.gamesAsBlack || 0,
+    };
+
     if (result === 'win') stats.wins++;
     else if (result === 'loss') stats.losses++;
     else stats.draws++;
+
+    if (playedAs === 'white') stats.gamesAsWhite++;
+    else if (playedAs === 'black') stats.gamesAsBlack++;
 
     await supabase
       .from('users')
@@ -227,5 +238,40 @@ export async function updateUserStats(
       .eq('id', userId);
   } catch (error) {
     console.error('Error updating user stats:', error);
+  }
+}
+
+export async function getColorStats(userId: string): Promise<{ white: number; black: number }> {
+  const user = await getUserById(userId);
+  if (!user) return { white: 0, black: 0 };
+
+  return {
+    white: user.stats.gamesAsWhite || 0,
+    black: user.stats.gamesAsBlack || 0,
+  };
+}
+
+export function determineColors(
+  player1Stats: { white: number; black: number },
+  player2Stats: { white: number; black: number }
+): { player1Color: 'white' | 'black'; player2Color: 'white' | 'black' } {
+  // Calculate the "white deficit" for each player
+  // A positive deficit means they've played more black than white
+  const player1Deficit = player1Stats.black - player1Stats.white;
+  const player2Deficit = player2Stats.black - player2Stats.white;
+
+  // The player with the higher deficit (played more black) should get white
+  // If equal, randomize
+  if (player1Deficit > player2Deficit) {
+    return { player1Color: 'white', player2Color: 'black' };
+  } else if (player2Deficit > player1Deficit) {
+    return { player1Color: 'black', player2Color: 'white' };
+  } else {
+    // Equal deficit - randomize
+    const random = Math.random() < 0.5;
+    return {
+      player1Color: random ? 'white' : 'black',
+      player2Color: random ? 'black' : 'white',
+    };
   }
 }

@@ -11,6 +11,9 @@ import {
   TimeControl,
   TimeControlSettings,
   OnlineGameState,
+  getLastGameInfo,
+  requestRematch,
+  clearLastGameInfo,
 } from '../multiplayer/onlineGame.js';
 import { getSocket } from '../multiplayer/socket.js';
 import { getCurrentUser } from '../multiplayer/auth.js';
@@ -371,23 +374,135 @@ function updateOnlineIndicator(): void {
 function showGameOverModal(message: string): void {
   const modal = document.createElement('div');
   modal.className = 'game-over-modal';
+  modal.id = 'gameOverModal';
+
+  const lastGame = getLastGameInfo();
+  const showRematch = lastGame !== null;
+
   modal.innerHTML = `
     <div class="modal-content">
       <h2>Game Over</h2>
       <p>${message}</p>
-      <button id="closeGameOverBtn" class="modal-btn">OK</button>
+      <div class="modal-buttons">
+        ${showRematch ? '<button id="rematchBtn" class="modal-btn primary">Rematch</button>' : ''}
+        <button id="closeGameOverBtn" class="modal-btn">Back to Lobby</button>
+      </div>
+      <div id="rematchStatus" class="rematch-status hidden"></div>
     </div>
   `;
   document.body.appendChild(modal);
 
+  // Setup rematch listeners
+  setupRematchListeners(modal);
+
+  document.getElementById('rematchBtn')?.addEventListener('click', () => {
+    requestRematch();
+    const rematchStatus = document.getElementById('rematchStatus');
+    if (rematchStatus) {
+      rematchStatus.classList.remove('hidden');
+      rematchStatus.textContent = 'Waiting for opponent...';
+    }
+    const rematchBtn = document.getElementById('rematchBtn');
+    if (rematchBtn) {
+      rematchBtn.textContent = 'Waiting...';
+      (rematchBtn as HTMLButtonElement).disabled = true;
+    }
+  });
+
   document.getElementById('closeGameOverBtn')?.addEventListener('click', () => {
+    closeGameOverAndReturnToLobby(modal);
+  });
+}
+
+function closeGameOverAndReturnToLobby(modal: HTMLElement): void {
+  modal.remove();
+  leaveOnlineGame();
+  clearLastGameInfo();
+  setBoardFlipped(false); // Reset board orientation
+  renderLobby();
+  // Re-setup callbacks since we recreated the lobby
+  setupGameCallbacksUI();
+  setOnUsersUpdate(renderOnlineUsers);
+}
+
+function setupRematchListeners(modal: HTMLElement): void {
+  const socket = getSocket();
+  if (!socket) return;
+
+  // Remove existing listeners to avoid duplicates
+  socket.off('game:rematch-received');
+  socket.off('game:rematch-sent');
+  socket.off('game:rematch-declined');
+  socket.off('game:rematch-expired');
+  socket.off('game:rematch-error');
+
+  // Received rematch request
+  socket.on('game:rematch-received', (data: { rematchId: string; requesterName: string }) => {
+    const rematchStatus = document.getElementById('rematchStatus');
+    if (rematchStatus) {
+      rematchStatus.classList.remove('hidden');
+      rematchStatus.innerHTML = `
+        <p><strong>${data.requesterName}</strong> wants a rematch!</p>
+        <div class="rematch-buttons">
+          <button id="acceptRematchBtn" class="lobby-btn primary">Accept</button>
+          <button id="declineRematchBtn" class="lobby-btn">Decline</button>
+        </div>
+      `;
+
+      document.getElementById('acceptRematchBtn')?.addEventListener('click', () => {
+        socket.emit('game:rematch-accept', { rematchId: data.rematchId });
+        rematchStatus.textContent = 'Starting game...';
+      });
+
+      document.getElementById('declineRematchBtn')?.addEventListener('click', () => {
+        socket.emit('game:rematch-decline', { rematchId: data.rematchId });
+        rematchStatus.classList.add('hidden');
+      });
+    }
+  });
+
+  // Rematch was declined
+  socket.on('game:rematch-declined', () => {
+    const rematchStatus = document.getElementById('rematchStatus');
+    if (rematchStatus) {
+      rematchStatus.textContent = 'Rematch declined.';
+    }
+    const rematchBtn = document.getElementById('rematchBtn');
+    if (rematchBtn) {
+      rematchBtn.textContent = 'Rematch';
+      (rematchBtn as HTMLButtonElement).disabled = false;
+    }
+  });
+
+  // Rematch expired
+  socket.on('game:rematch-expired', () => {
+    const rematchStatus = document.getElementById('rematchStatus');
+    if (rematchStatus) {
+      rematchStatus.textContent = 'Rematch request expired.';
+    }
+    const rematchBtn = document.getElementById('rematchBtn');
+    if (rematchBtn) {
+      rematchBtn.textContent = 'Rematch';
+      (rematchBtn as HTMLButtonElement).disabled = false;
+    }
+  });
+
+  // Rematch error
+  socket.on('game:rematch-error', (data: { message: string }) => {
+    const rematchStatus = document.getElementById('rematchStatus');
+    if (rematchStatus) {
+      rematchStatus.textContent = data.message;
+    }
+    const rematchBtn = document.getElementById('rematchBtn');
+    if (rematchBtn) {
+      rematchBtn.textContent = 'Rematch';
+      (rematchBtn as HTMLButtonElement).disabled = false;
+    }
+  });
+
+  // Game started (rematch accepted) - close modal
+  socket.on('game:started', () => {
     modal.remove();
-    leaveOnlineGame();
-    setBoardFlipped(false); // Reset board orientation
-    renderLobby();
-    // Re-setup callbacks since we recreated the lobby
-    setupGameCallbacksUI();
-    setOnUsersUpdate(renderOnlineUsers);
   });
 }
 

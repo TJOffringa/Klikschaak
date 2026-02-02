@@ -8,6 +8,15 @@ export interface TimeControlSettings {
   increment: number;    // ms
 }
 
+export interface GameResult {
+  type: 'checkmate' | 'stalemate' | 'timeout' | 'resignation' | 'disconnect';
+  winner: PieceColor | null;
+  whitePlayerId?: string;
+  blackPlayerId?: string;
+  timeControl?: TimeControl;
+  customSettings?: TimeControlSettings;
+}
+
 export interface OnlineGameState {
   gameId: string;
   gameCode: string;
@@ -22,15 +31,19 @@ export interface OnlineGameState {
   movedPawns: Piece[];
   gameStarted: boolean;
   gameOver: boolean;
-  result: {
-    type: 'checkmate' | 'stalemate' | 'timeout' | 'resignation' | 'disconnect';
-    winner: PieceColor | null;
-  } | null;
+  result: GameResult | null;
 }
 
 // State
 let gameState: OnlineGameState | null = null;
 let isOnlineMode = false;
+let lastGameInfo: {
+  opponentId: string;
+  opponentName: string;
+  whitePlayerId: string;
+  timeControl: TimeControl;
+  customSettings?: TimeControlSettings;
+} | null = null;
 
 // Callbacks
 let onGameCreated: ((gameCode: string) => void) | null = null;
@@ -38,7 +51,7 @@ let onGameJoined: ((state: OnlineGameState) => void) | null = null;
 let onGameStarted: ((state: OnlineGameState) => void) | null = null;
 let onMoveMade: ((state: OnlineGameState) => void) | null = null;
 let onTimerUpdate: ((white: number, black: number) => void) | null = null;
-let onGameOver: ((result: OnlineGameState['result']) => void) | null = null;
+let onGameOver: ((result: GameResult) => void) | null = null;
 let onError: ((message: string) => void) | null = null;
 
 export function setupGameListeners(): void {
@@ -161,10 +174,26 @@ export function setupGameListeners(): void {
     }
   });
 
-  socket.on('game:over', (result: OnlineGameState['result']) => {
+  socket.on('game:over', (result: GameResult) => {
     if (gameState) {
       gameState.gameOver = true;
       gameState.result = result;
+
+      // Store info for rematch
+      if (result.whitePlayerId && result.blackPlayerId) {
+        const myId = result.whitePlayerId === gameState.myColor ? result.whitePlayerId :
+                     (gameState.myColor === 'white' ? result.whitePlayerId : result.blackPlayerId);
+        const opponentId = myId === result.whitePlayerId ? result.blackPlayerId : result.whitePlayerId;
+
+        lastGameInfo = {
+          opponentId,
+          opponentName: gameState.opponent?.username || 'Unknown',
+          whitePlayerId: result.whitePlayerId,
+          timeControl: result.timeControl || 'standard',
+          customSettings: result.customSettings,
+        };
+      }
+
       onGameOver?.(result);
     }
   });
@@ -224,7 +253,7 @@ export function setGameCallbacks(callbacks: {
   onGameStarted?: (state: OnlineGameState) => void;
   onMoveMade?: (state: OnlineGameState) => void;
   onTimerUpdate?: (white: number, black: number) => void;
-  onGameOver?: (result: OnlineGameState['result']) => void;
+  onGameOver?: (result: GameResult) => void;
   onError?: (message: string) => void;
 }): void {
   if (callbacks.onGameCreated) onGameCreated = callbacks.onGameCreated;
@@ -299,4 +328,24 @@ export function getMyColor(): PieceColor | null {
 export function leaveOnlineGame(): void {
   gameState = null;
   isOnlineMode = false;
+}
+
+export function getLastGameInfo() {
+  return lastGameInfo;
+}
+
+export function requestRematch(): void {
+  if (!lastGameInfo) return;
+
+  const socket = getSocket();
+  socket?.emit('game:rematch-request', {
+    opponentId: lastGameInfo.opponentId,
+    timeControl: lastGameInfo.timeControl,
+    customSettings: lastGameInfo.customSettings,
+    previousWhiteId: lastGameInfo.whitePlayerId,
+  });
+}
+
+export function clearLastGameInfo(): void {
+  lastGameInfo = null;
 }

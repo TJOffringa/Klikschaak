@@ -1,7 +1,8 @@
 import { Server, Socket } from 'socket.io';
 import { lobbyService } from '../../services/lobby.service.js';
 import { gameService } from '../../services/game.service.js';
-import type { Player } from '../../game/types.js';
+import { getColorStats, determineColors } from '../../services/auth.service.js';
+import type { Player, PieceColor } from '../../game/types.js';
 import type { TimeControl, TimeControlSettings } from '../../game/Timer.js';
 
 // Store pending challenges
@@ -11,6 +12,17 @@ const pendingChallenges: Map<string, {
   targetId: string;
   timeControl: TimeControl;
   customSettings?: TimeControlSettings;
+  expiresAt: number;
+}> = new Map();
+
+// Store pending rematches
+const pendingRematches: Map<string, {
+  requesterId: string;
+  requesterName: string;
+  opponentId: string;
+  timeControl: TimeControl;
+  customSettings?: TimeControlSettings;
+  previousWhiteId: string; // Who was white in the previous game
   expiresAt: number;
 }> = new Map();
 
@@ -115,7 +127,7 @@ export function setupLobbyHandlers(io: Server, socket: Socket, player: Player): 
   });
 
   // Handle challenge accept
-  socket.on('lobby:challenge-accept', (data: { challengeId: string }) => {
+  socket.on('lobby:challenge-accept', async (data: { challengeId: string }) => {
     const challenge = pendingChallenges.get(data.challengeId);
 
     if (!challenge) {
@@ -141,9 +153,6 @@ export function setupLobbyHandlers(io: Server, socket: Socket, player: Player): 
     // Remove challenge
     pendingChallenges.delete(data.challengeId);
 
-    // Create game
-    const session = gameService.createGame(challenge.timeControl, challenge.customSettings);
-
     // Get challenger info
     const challengerUser = lobbyService.getUser(challenge.challengerId);
     if (!challengerUser) {
@@ -151,23 +160,36 @@ export function setupLobbyHandlers(io: Server, socket: Socket, player: Player): 
       return;
     }
 
-    // Add challenger as white
-    const challengerPlayer: Player = {
-      id: challenge.challengerId,
-      username: challengerUser.username,
-      friendCode: challengerUser.friendCode,
-      socketId: challengerUser.socketId,
-    };
-    gameService.joinGame(session.id, challengerPlayer);
+    // Determine colors based on game history
+    const challengerStats = await getColorStats(challenge.challengerId);
+    const accepterStats = await getColorStats(player.id);
+    const colors = determineColors(challengerStats, accepterStats);
 
-    // Add accepter as black
-    const accepterPlayer: Player = {
-      id: player.id,
-      username: player.username,
-      friendCode: player.friendCode,
-      socketId: socket.id,
+    const whitePlayerId = colors.player1Color === 'white' ? challenge.challengerId : player.id;
+    const blackPlayerId = colors.player1Color === 'black' ? challenge.challengerId : player.id;
+    const whiteUser = whitePlayerId === challenge.challengerId ? challengerUser : { username: player.username, friendCode: player.friendCode, socketId: socket.id };
+    const blackUser = blackPlayerId === challenge.challengerId ? challengerUser : { username: player.username, friendCode: player.friendCode, socketId: socket.id };
+
+    // Create game
+    const session = gameService.createGame(challenge.timeControl, challenge.customSettings);
+
+    // Add white player first
+    const whitePlayer: Player = {
+      id: whitePlayerId,
+      username: whiteUser.username,
+      friendCode: whiteUser.friendCode,
+      socketId: whiteUser.socketId,
     };
-    gameService.joinGame(session.id, accepterPlayer);
+    gameService.joinGame(session.id, whitePlayer);
+
+    // Add black player
+    const blackPlayer: Player = {
+      id: blackPlayerId,
+      username: blackUser.username,
+      friendCode: blackUser.friendCode,
+      socketId: blackUser.socketId,
+    };
+    gameService.joinGame(session.id, blackPlayer);
 
     // Join socket rooms
     const challengerSocket = io.sockets.sockets.get(challengerUser.socketId);
@@ -186,7 +208,13 @@ export function setupLobbyHandlers(io: Server, socket: Socket, player: Player): 
         io.to(`game:${session.id}`).emit('game:timer-sync', { white, black });
       },
       async (result) => {
-        io.to(`game:${session.id}`).emit('game:over', result);
+        io.to(`game:${session.id}`).emit('game:over', {
+          ...result,
+          whitePlayerId,
+          blackPlayerId,
+          timeControl: challenge.timeControl,
+          customSettings: challenge.customSettings,
+        });
         await gameService.endGame(session.id, result);
 
         // Update lobby status for both players
@@ -200,11 +228,14 @@ export function setupLobbyHandlers(io: Server, socket: Socket, player: Player): 
     // Start the game
     session.startGame();
 
+    const challengerColor: PieceColor = whitePlayerId === challenge.challengerId ? 'white' : 'black';
+    const accepterColor: PieceColor = challengerColor === 'white' ? 'black' : 'white';
+
     // Notify challenger
     io.to(challengerUser.socketId).emit('game:created', {
       gameId: session.id,
       gameCode: session.gameCode,
-      color: 'white',
+      color: challengerColor,
       timeControl: challenge.timeControl,
     });
     io.to(challengerUser.socketId).emit('game:started', {
@@ -212,15 +243,15 @@ export function setupLobbyHandlers(io: Server, socket: Socket, player: Player): 
       board: session.getBoard(),
       currentTurn: session.getCurrentTurn(),
       timer: session.getTimerState(),
-      white: { username: challengerUser.username },
-      black: { username: player.username },
+      white: { username: whiteUser.username },
+      black: { username: blackUser.username },
     });
 
     // Notify accepter
     socket.emit('game:joined', {
       gameId: session.id,
       gameCode: session.gameCode,
-      color: 'black',
+      color: accepterColor,
       opponent: { username: challengerUser.username },
     });
     socket.emit('game:started', {
@@ -228,8 +259,8 @@ export function setupLobbyHandlers(io: Server, socket: Socket, player: Player): 
       board: session.getBoard(),
       currentTurn: session.getCurrentTurn(),
       timer: session.getTimerState(),
-      white: { username: challengerUser.username },
-      black: { username: player.username },
+      white: { username: whiteUser.username },
+      black: { username: blackUser.username },
     });
   });
 
@@ -268,12 +299,219 @@ export function setupLobbyHandlers(io: Server, socket: Socket, player: Player): 
     }
   });
 
+  // Handle rematch request
+  socket.on('game:rematch-request', (data: {
+    opponentId: string;
+    timeControl: TimeControl;
+    customSettings?: TimeControlSettings;
+    previousWhiteId: string;
+  }) => {
+    const opponentUser = lobbyService.getUser(data.opponentId);
+
+    if (!opponentUser) {
+      socket.emit('game:rematch-error', { message: 'Opponent went offline' });
+      return;
+    }
+
+    // Create rematch ID
+    const rematchId = `rematch-${player.id}-${data.opponentId}-${Date.now()}`;
+
+    // Store rematch (expires in 30 seconds)
+    pendingRematches.set(rematchId, {
+      requesterId: player.id,
+      requesterName: player.username,
+      opponentId: data.opponentId,
+      timeControl: data.timeControl,
+      customSettings: data.customSettings,
+      previousWhiteId: data.previousWhiteId,
+      expiresAt: Date.now() + 30000,
+    });
+
+    // Clean up after 30 seconds
+    setTimeout(() => {
+      if (pendingRematches.has(rematchId)) {
+        pendingRematches.delete(rematchId);
+        socket.emit('game:rematch-expired', { rematchId });
+      }
+    }, 30000);
+
+    // Send rematch request to opponent
+    io.to(opponentUser.socketId).emit('game:rematch-received', {
+      rematchId,
+      requesterId: player.id,
+      requesterName: player.username,
+      timeControl: data.timeControl,
+      customSettings: data.customSettings,
+    });
+
+    socket.emit('game:rematch-sent', { rematchId });
+  });
+
+  // Handle rematch accept
+  socket.on('game:rematch-accept', async (data: { rematchId: string }) => {
+    const rematch = pendingRematches.get(data.rematchId);
+
+    if (!rematch) {
+      socket.emit('game:rematch-error', { message: 'Rematch request not found or expired' });
+      return;
+    }
+
+    if (rematch.opponentId !== player.id) {
+      socket.emit('game:rematch-error', { message: 'This rematch is not for you' });
+      return;
+    }
+
+    // Check if either player is in a game
+    const requesterGame = gameService.getGameByPlayer(rematch.requesterId);
+    const opponentGame = gameService.getGameByPlayer(rematch.opponentId);
+
+    if (requesterGame || opponentGame) {
+      socket.emit('game:rematch-error', { message: 'One of the players is already in a game' });
+      pendingRematches.delete(data.rematchId);
+      return;
+    }
+
+    // Remove rematch request
+    pendingRematches.delete(data.rematchId);
+
+    // Get requester info
+    const requesterUser = lobbyService.getUser(rematch.requesterId);
+    if (!requesterUser) {
+      socket.emit('game:rematch-error', { message: 'Opponent went offline' });
+      return;
+    }
+
+    // Swap colors from previous game
+    const newWhiteId = rematch.previousWhiteId === rematch.requesterId ? rematch.opponentId : rematch.requesterId;
+    const newBlackId = newWhiteId === rematch.requesterId ? rematch.opponentId : rematch.requesterId;
+
+    const whiteUser = newWhiteId === rematch.requesterId ? requesterUser : { username: player.username, friendCode: player.friendCode, socketId: socket.id };
+    const blackUser = newBlackId === rematch.requesterId ? requesterUser : { username: player.username, friendCode: player.friendCode, socketId: socket.id };
+
+    // Create game
+    const session = gameService.createGame(rematch.timeControl, rematch.customSettings);
+
+    // Add white player
+    const whitePlayer: Player = {
+      id: newWhiteId,
+      username: whiteUser.username,
+      friendCode: whiteUser.friendCode,
+      socketId: whiteUser.socketId,
+    };
+    gameService.joinGame(session.id, whitePlayer);
+
+    // Add black player
+    const blackPlayer: Player = {
+      id: newBlackId,
+      username: blackUser.username,
+      friendCode: blackUser.friendCode,
+      socketId: blackUser.socketId,
+    };
+    gameService.joinGame(session.id, blackPlayer);
+
+    // Join socket rooms
+    const requesterSocket = io.sockets.sockets.get(requesterUser.socketId);
+    requesterSocket?.join(`game:${session.id}`);
+    socket.join(`game:${session.id}`);
+
+    // Update lobby status
+    lobbyService.updateUserStatus(rematch.requesterId, 'in-game');
+    lobbyService.updateUserStatus(player.id, 'in-game');
+    io.emit('lobby:user-status', { id: rematch.requesterId, status: 'in-game' });
+    io.emit('lobby:user-status', { id: player.id, status: 'in-game' });
+
+    // Set up game callbacks
+    session.setCallbacks(
+      (white, black) => {
+        io.to(`game:${session.id}`).emit('game:timer-sync', { white, black });
+      },
+      async (result) => {
+        io.to(`game:${session.id}`).emit('game:over', {
+          ...result,
+          whitePlayerId: newWhiteId,
+          blackPlayerId: newBlackId,
+          timeControl: rematch.timeControl,
+          customSettings: rematch.customSettings,
+        });
+        await gameService.endGame(session.id, result);
+
+        // Update lobby status
+        lobbyService.updateUserStatus(rematch.requesterId, 'online');
+        lobbyService.updateUserStatus(player.id, 'online');
+        io.emit('lobby:user-status', { id: rematch.requesterId, status: 'online' });
+        io.emit('lobby:user-status', { id: player.id, status: 'online' });
+      }
+    );
+
+    // Start the game
+    session.startGame();
+
+    const requesterColor: PieceColor = newWhiteId === rematch.requesterId ? 'white' : 'black';
+    const accepterColor: PieceColor = requesterColor === 'white' ? 'black' : 'white';
+
+    // Notify requester
+    io.to(requesterUser.socketId).emit('game:created', {
+      gameId: session.id,
+      gameCode: session.gameCode,
+      color: requesterColor,
+      timeControl: rematch.timeControl,
+    });
+    io.to(requesterUser.socketId).emit('game:started', {
+      gameId: session.id,
+      board: session.getBoard(),
+      currentTurn: session.getCurrentTurn(),
+      timer: session.getTimerState(),
+      white: { username: whiteUser.username },
+      black: { username: blackUser.username },
+    });
+
+    // Notify accepter
+    socket.emit('game:joined', {
+      gameId: session.id,
+      gameCode: session.gameCode,
+      color: accepterColor,
+      opponent: { username: requesterUser.username },
+    });
+    socket.emit('game:started', {
+      gameId: session.id,
+      board: session.getBoard(),
+      currentTurn: session.getCurrentTurn(),
+      timer: session.getTimerState(),
+      white: { username: whiteUser.username },
+      black: { username: blackUser.username },
+    });
+  });
+
+  // Handle rematch decline
+  socket.on('game:rematch-decline', (data: { rematchId: string }) => {
+    const rematch = pendingRematches.get(data.rematchId);
+
+    if (rematch && rematch.opponentId === player.id) {
+      pendingRematches.delete(data.rematchId);
+
+      // Notify requester
+      const requesterUser = lobbyService.getUser(rematch.requesterId);
+      if (requesterUser) {
+        io.to(requesterUser.socketId).emit('game:rematch-declined', {
+          rematchId: data.rematchId,
+        });
+      }
+    }
+  });
+
   // Handle disconnect
   socket.on('disconnect', () => {
     // Cancel any pending challenges from/to this player
     for (const [challengeId, challenge] of pendingChallenges.entries()) {
       if (challenge.challengerId === player.id || challenge.targetId === player.id) {
         pendingChallenges.delete(challengeId);
+      }
+    }
+
+    // Cancel any pending rematches from/to this player
+    for (const [rematchId, rematch] of pendingRematches.entries()) {
+      if (rematch.requesterId === player.id || rematch.opponentId === player.id) {
+        pendingRematches.delete(rematchId);
       }
     }
 

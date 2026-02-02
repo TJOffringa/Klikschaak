@@ -83,8 +83,8 @@ class GameService {
         }
 
         await Promise.all([
-          updateUserStats(whitePlayer.id, whiteResult),
-          updateUserStats(blackPlayer.id, blackResult),
+          updateUserStats(whitePlayer.id, whiteResult, 'white'),
+          updateUserStats(blackPlayer.id, blackResult, 'black'),
         ]);
 
         // Save game to database

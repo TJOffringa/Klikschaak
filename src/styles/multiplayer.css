@@ -557,6 +557,48 @@
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
 }
 
+.modal-btn.primary {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.modal-btn.primary:hover {
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+}
+
+.modal-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.rematch-status {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.rematch-status.hidden {
+  display: none;
+}
+
+.rematch-status p {
+  margin: 0 0 12px 0;
+}
+
+.rematch-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
 /* Turn indicator for online mode */
 .turn-indicator.my-turn {
   animation: pulse-turn 1s ease-in-out infinite;

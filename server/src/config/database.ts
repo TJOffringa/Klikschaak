@@ -26,6 +26,8 @@ export interface DbUser {
     wins: number;
     losses: number;
     draws: number;
+    gamesAsWhite: number;
+    gamesAsBlack: number;
   };
   is_admin: boolean;
 }
