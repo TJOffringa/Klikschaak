@@ -3,6 +3,7 @@ import { isWhitePiece, getPieceValue, getPieceType, PIECE_SYMBOLS } from '../gam
 import * as state from '../game/state';
 import { t, getPieceName, getLanguage, setLanguage } from '../i18n/translations';
 import { handleSquareClick, handleUnklikSelect, executePromotion, movePiece, executeCastling, initGame, toggleAutoPromote } from '../game/actions';
+import { shouldUseEditorClick, handleEditorBoardClick, openAnalysisFromGame } from './analysisUI.js';
 
 // Board orientation state
 let boardFlipped = false;
@@ -159,7 +160,12 @@ export function renderBoard(): void {
       square.onclick = (e) => {
         const target = e.target as HTMLElement;
         if (!target.classList.contains('triangle-left') && !target.classList.contains('triangle-right')) {
-          handleSquareClick(row, col);
+          // Check if we're in editor mode
+          if (shouldUseEditorClick()) {
+            handleEditorBoardClick(row, col);
+          } else {
+            handleSquareClick(row, col);
+          }
         }
       };
 
@@ -293,11 +299,26 @@ export function showGameOver(type: 'checkmate' | 'stalemate', winner: PieceColor
   }
   box.appendChild(message);
 
-  const btn = document.createElement('button');
-  btn.className = 'game-over-btn';
-  btn.textContent = t('newGame');
-  btn.onclick = () => initGame();
-  box.appendChild(btn);
+  const buttonsDiv = document.createElement('div');
+  buttonsDiv.style.cssText = 'display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;';
+
+  const analysisBtn = document.createElement('button');
+  analysisBtn.className = 'game-over-btn';
+  analysisBtn.textContent = getLanguage() === 'nl' ? 'Analyse' : 'Analysis';
+  analysisBtn.onclick = () => {
+    overlay.remove();
+    const moves = state.getMoveHistory();
+    openAnalysisFromGame(moves);
+  };
+  buttonsDiv.appendChild(analysisBtn);
+
+  const newGameBtn = document.createElement('button');
+  newGameBtn.className = 'game-over-btn';
+  newGameBtn.textContent = t('newGame');
+  newGameBtn.onclick = () => initGame();
+  buttonsDiv.appendChild(newGameBtn);
+
+  box.appendChild(buttonsDiv);
 
   overlay.appendChild(box);
   document.body.appendChild(overlay);

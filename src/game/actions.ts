@@ -11,12 +11,13 @@ import * as state from './state';
 import { getCombinedMoves, getPieceMoves, wouldBeInCheck, isInCheck, hasLegalMoves } from './moves';
 import { renderBoard, updateUI, showCheckIndicator, showGameOver, showPromotionDialog, showCastlingChoiceDialog, showEnPassantChoiceDialog } from '../ui/render';
 import { isOnline, isMyTurn, sendMove, getMyColor } from '../multiplayer/onlineGame';
+import { isAnalysisMode, addAnalysisMove } from '../analysis/analysisMode.js';
 
 export function handleSquareClick(row: number, col: number): void {
-  if (state.isGameOver()) return;
+  if (state.isGameOver() && !isAnalysisMode()) return;
 
-  // In online mode, only allow moves on your turn
-  if (isOnline() && !isMyTurn()) {
+  // In online mode (but not analysis mode), only allow moves on your turn
+  if (isOnline() && !isMyTurn() && !isAnalysisMode()) {
     // Can still select pieces to see valid moves
     const board = state.getBoard();
     const square = board[row][col];
@@ -90,11 +91,11 @@ export function handleSquareClick(row: number, col: number): void {
 }
 
 export function handleUnklikSelect(row: number, col: number, pieceIndex: number, e: Event): void {
-  if (state.isGameOver()) return;
+  if (state.isGameOver() && !isAnalysisMode()) return;
   e.stopPropagation();
 
-  // In online mode, only allow on your turn
-  if (isOnline() && !isMyTurn()) return;
+  // In online mode (but not analysis mode), only allow on your turn
+  if (isOnline() && !isMyTurn() && !isAnalysisMode()) return;
 
   const board = state.getBoard();
   const square = board[row][col];
@@ -153,8 +154,8 @@ export function handleUnklikSelect(row: number, col: number, pieceIndex: number,
 }
 
 export function executeCastling(fromRow: number, fromCol: number, toRow: number, toCol: number, castleType: MoveType): void {
-  // In online mode, send move to server
-  if (isOnline()) {
+  // In online mode (but not analysis mode), send move to server
+  if (isOnline() && !isAnalysisMode()) {
     sendMove(
       { row: fromRow, col: fromCol },
       { row: toRow, col: toCol },
@@ -214,14 +215,19 @@ export function executeCastling(fromRow: number, fromCol: number, toRow: number,
   state.switchTurn();
   state.addMoveToHistory({ turn, notation });
 
+  // If in analysis mode, also record the move there
+  if (isAnalysisMode()) {
+    addAnalysisMove({ turn, notation });
+  }
+
   renderBoard();
   updateUI();
   checkForCheckmate();
 }
 
 export function movePiece(fromRow: number, fromCol: number, toRow: number, toCol: number, moveType: MoveType, promoteTo?: Piece): void {
-  // In online mode, send move to server (except for promotion which needs piece selection)
-  if (isOnline()) {
+  // In online mode (but not analysis mode), send move to server (except for promotion which needs piece selection)
+  if (isOnline() && !isAnalysisMode()) {
     const selectedUnklikPiece = state.getSelectedUnklikPiece();
     const board = state.getBoard();
     const fromSq = board[fromRow][fromCol];
@@ -442,6 +448,11 @@ function finishMove(moveNotation: string): void {
   state.switchTurn();
   state.addMoveToHistory({ turn, notation: moveNotation });
 
+  // If in analysis mode, also record the move there
+  if (isAnalysisMode()) {
+    addAnalysisMove({ turn, notation: moveNotation });
+  }
+
   renderBoard();
   updateUI();
   checkForCheckmate();
@@ -455,8 +466,8 @@ export function executePromotion(piece: Piece): void {
   const overlay = document.getElementById('promotionOverlay');
   if (overlay) overlay.remove();
 
-  // In online mode, send move with promotion piece
-  if (isOnline()) {
+  // In online mode (but not analysis mode), send move with promotion piece
+  if (isOnline() && !isAnalysisMode()) {
     const { fromRow, fromCol, moveType, unklikIndex } = promotion as any;
     sendMove(
       { row: fromRow, col: fromCol },
@@ -489,6 +500,11 @@ export function executePromotion(piece: Piece): void {
   state.addMoveToHistory({ turn, notation: finalNotation });
   state.setPendingPromotion(null);
 
+  // If in analysis mode, also record the move there
+  if (isAnalysisMode()) {
+    addAnalysisMove({ turn, notation: finalNotation });
+  }
+
   renderBoard();
   updateUI();
   checkForCheckmate();
@@ -513,6 +529,10 @@ function checkForCheckmate(): void {
 }
 
 export function initGame(): void {
+  // Remove any game over overlay
+  const overlay = document.getElementById('gameOverOverlay');
+  if (overlay) overlay.remove();
+
   state.initializeBoard();
   renderBoard();
   updateUI();

@@ -1,10 +1,12 @@
 import './styles/main.css';
 import './styles/multiplayer.css';
+import './styles/analysis.css';
 import { initLanguage } from './i18n/translations';
 import { initGame } from './game/actions';
 import { renderBoard, updateUI } from './ui/render';
 import { initDragAndDrop } from './ui/dragdrop';
 import { initAuthUI } from './ui/authUI';
+import { initAnalysisButton } from './ui/analysisUI.js';
 
 // Initialize language from localStorage or browser settings
 initLanguage();
@@ -14,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initGame();
   initDragAndDrop();
   initAuthUI();
+  initAnalysisButton();
   updateStaticTexts();
 });
 

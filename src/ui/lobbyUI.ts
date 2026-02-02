@@ -18,6 +18,7 @@ import {
 import { getSocket } from '../multiplayer/socket.js';
 import { getCurrentUser } from '../multiplayer/auth.js';
 import { renderBoard, updateUI, setBoardFlipped } from './render.js';
+import { openAnalysisFromGame } from './analysisUI.js';
 import * as state from '../game/state.js';
 
 let lobbyContainer: HTMLElement | null = null;
@@ -378,6 +379,7 @@ function showGameOverModal(message: string): void {
 
   const lastGame = getLastGameInfo();
   const showRematch = lastGame !== null;
+  const gameState = getOnlineGameState();
 
   modal.innerHTML = `
     <div class="modal-content">
@@ -385,12 +387,34 @@ function showGameOverModal(message: string): void {
       <p>${message}</p>
       <div class="modal-buttons">
         ${showRematch ? '<button id="rematchBtn" class="modal-btn primary">Rematch</button>' : ''}
+        <button id="analyzeGameBtn" class="modal-btn">Analysis</button>
         <button id="closeGameOverBtn" class="modal-btn">Back to Lobby</button>
       </div>
       <div id="rematchStatus" class="rematch-status hidden"></div>
     </div>
   `;
   document.body.appendChild(modal);
+
+  // Analysis button handler
+  document.getElementById('analyzeGameBtn')?.addEventListener('click', () => {
+    modal.remove();
+    // Get move history and player names
+    const moves = gameState?.moveHistory || state.getMoveHistory();
+    const white = gameState?.myColor === 'white'
+      ? getCurrentUser()?.username
+      : gameState?.opponent?.username;
+    const black = gameState?.myColor === 'black'
+      ? getCurrentUser()?.username
+      : gameState?.opponent?.username;
+
+    // Leave the online game state
+    leaveOnlineGame();
+    clearLastGameInfo();
+    setBoardFlipped(false);
+
+    // Open analysis mode with the game moves
+    openAnalysisFromGame(moves, white, black);
+  });
 
   // Setup rematch listeners
   setupRematchListeners(modal);
