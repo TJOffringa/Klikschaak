@@ -2,8 +2,9 @@ import type { Piece, MoveType, PieceColor } from '../game/types';
 import { isWhitePiece, getPieceValue, getPieceType, PIECE_SYMBOLS } from '../game/constants';
 import * as state from '../game/state';
 import { t, getPieceName, getLanguage, setLanguage } from '../i18n/translations';
-import { handleSquareClick, handleUnklikSelect, executePromotion, movePiece, executeCastling, initGame, toggleAutoPromote } from '../game/actions';
+import { handleSquareClick, handleUnklikSelect, executePromotion, movePiece, executeCastling, initGame, toggleAutoPromote, handleRightClick } from '../game/actions';
 import { shouldUseEditorClick, handleEditorBoardClick, openAnalysisFromGame } from './analysisUI.js';
+import { isPremoveSquare } from '../multiplayer/premove.js';
 
 // Board orientation state
 let boardFlipped = false;
@@ -143,6 +144,14 @@ export function renderBoard(): void {
         square.classList.add('selected');
       }
 
+      // Check for premove highlighting
+      const premoveType = isPremoveSquare(row, col);
+      if (premoveType === 'from') {
+        square.classList.add('premove-from');
+      } else if (premoveType === 'to') {
+        square.classList.add('premove-to');
+      }
+
       const pieces = board[row][col].pieces;
       const isSel = selectedSquare && selectedSquare[0] === row && selectedSquare[1] === col;
       square.innerHTML = renderPiece(pieces, row, col, !!isSel);
@@ -167,6 +176,12 @@ export function renderBoard(): void {
             handleSquareClick(row, col);
           }
         }
+      };
+
+      // Right-click to cancel premove
+      square.oncontextmenu = (e) => {
+        e.preventDefault();
+        handleRightClick();
       };
 
       rowEl.appendChild(square);

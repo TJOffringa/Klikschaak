@@ -12,17 +12,49 @@ import { getCombinedMoves, getPieceMoves, wouldBeInCheck, isInCheck, hasLegalMov
 import { renderBoard, updateUI, showCheckIndicator, showGameOver, showPromotionDialog, showCastlingChoiceDialog, showEnPassantChoiceDialog } from '../ui/render';
 import { isOnline, isMyTurn, sendMove, getMyColor } from '../multiplayer/onlineGame';
 import { isAnalysisMode, addAnalysisMove } from '../analysis/analysisMode.js';
+import { hasPremove, setPremove, clearPremove, getPremove } from '../multiplayer/premove.js';
 
 export function handleSquareClick(row: number, col: number): void {
   if (state.isGameOver() && !isAnalysisMode()) return;
 
-  // In online mode (but not analysis mode), only allow moves on your turn
+  // In online mode (but not analysis mode), handle premoves when not your turn
   if (isOnline() && !isMyTurn() && !isAnalysisMode()) {
-    // Can still select pieces to see valid moves
     const board = state.getBoard();
     const square = board[row][col];
     const myColor = getMyColor();
+    const selectedSquare = state.getSelectedSquare();
 
+    // If we have a selected square and click on a valid move, set premove
+    if (selectedSquare) {
+      const validMoves = state.getValidMoves();
+      const move = validMoves.find(m => m.row === row && m.col === col);
+
+      if (move) {
+        // Set premove
+        const [selRow, selCol] = selectedSquare;
+        const unklikIndex = state.getSelectedUnklikPiece();
+
+        // Clear any existing premove and set new one
+        setPremove(
+          { row: selRow, col: selCol },
+          { row, col },
+          move.type,
+          unklikIndex !== null ? unklikIndex : undefined
+        );
+
+        state.clearSelection();
+        renderBoard();
+        updateUI();
+        return;
+      }
+    }
+
+    // Clicking elsewhere clears premove and tries to select a piece
+    if (hasPremove()) {
+      clearPremove();
+    }
+
+    // Select own pieces to see valid moves (for premove planning)
     if (square.pieces.length > 0 && isWhitePiece(square.pieces[0]) === (myColor === 'white')) {
       state.setSelectedSquare([row, col]);
       state.setSelectedUnklikPiece(null);
@@ -31,9 +63,12 @@ export function handleSquareClick(row: number, col: number): void {
         state.getCastlingRights(), state.getEnPassantTarget(), state.getMovedPawns(), null
       );
       state.setValidMoves(moves);
-      renderBoard();
-      updateUI();
+    } else {
+      state.clearSelection();
     }
+
+    renderBoard();
+    updateUI();
     return;
   }
 
@@ -541,4 +576,86 @@ export function initGame(): void {
 export function toggleAutoPromote(): void {
   const checkbox = document.getElementById('autoPromote') as HTMLInputElement;
   state.setAutoPromote(checkbox.checked);
+}
+
+// Handle right-click to cancel premove
+export function handleRightClick(): void {
+  if (hasPremove()) {
+    clearPremove();
+    state.clearSelection();
+    renderBoard();
+    updateUI();
+  }
+}
+
+// Try to execute a pending premove - called when it becomes your turn
+export function tryExecutePremove(): boolean {
+  if (!hasPremove()) return false;
+
+  const premove = getPremove();
+  if (!premove.from || !premove.to || !premove.moveType) {
+    clearPremove();
+    return false;
+  }
+
+  const board = state.getBoard();
+  const fromSquare = board[premove.from.row][premove.from.col];
+
+  // Check if the premove is still valid
+  if (fromSquare.pieces.length === 0) {
+    clearPremove();
+    return false;
+  }
+
+  // Verify it's still our piece
+  const myColor = getMyColor();
+  const isOurPiece = isWhitePiece(fromSquare.pieces[0]) === (myColor === 'white');
+  if (!isOurPiece) {
+    clearPremove();
+    return false;
+  }
+
+  // Get valid moves for this piece
+  const validMoves = getCombinedMoves(
+    board,
+    premove.from.row,
+    premove.from.col,
+    fromSquare.pieces,
+    state.getCastlingRights(),
+    state.getEnPassantTarget(),
+    state.getMovedPawns(),
+    premove.unklikPieceIndex
+  );
+
+  // Check if the target square is still a valid move
+  const matchingMove = validMoves.find(
+    m => m.row === premove.to!.row && m.col === premove.to!.col
+  );
+
+  if (!matchingMove) {
+    clearPremove();
+    return false;
+  }
+
+  // Execute the premove
+  const { from, to, unklikPieceIndex, promotionPiece } = premove;
+
+  // Set up selection state for the move
+  state.setSelectedSquare([from.row, from.col]);
+  if (unklikPieceIndex !== null) {
+    state.setSelectedUnklikPiece(unklikPieceIndex);
+  }
+
+  // Clear premove before executing
+  clearPremove();
+
+  // Execute based on move type
+  const moveType = matchingMove.type;
+  if (moveType.startsWith('castle')) {
+    executeCastling(from.row, from.col, to.row, to.col, moveType);
+  } else {
+    movePiece(from.row, from.col, to.row, to.col, moveType, promotionPiece || undefined);
+  }
+
+  return true;
 }

@@ -19,6 +19,8 @@ import { getSocket } from '../multiplayer/socket.js';
 import { getCurrentUser } from '../multiplayer/auth.js';
 import { renderBoard, updateUI, setBoardFlipped } from './render.js';
 import { openAnalysisFromGame } from './analysisUI.js';
+import { tryExecutePremove } from '../game/actions.js';
+import { clearPremove } from '../multiplayer/premove.js';
 import * as state from '../game/state.js';
 
 let lobbyContainer: HTMLElement | null = null;
@@ -258,6 +260,14 @@ function setupGameCallbacksUI(): void {
       updateUI();
       updateTimerDisplay(gameState.timer.white, gameState.timer.black, gameState.currentTurn);
       updateOnlineIndicator();
+
+      // If it's now our turn, try to execute any pending premove
+      if (gameState.currentTurn === gameState.myColor) {
+        // Small delay to ensure board is rendered before premove
+        setTimeout(() => {
+          tryExecutePremove();
+        }, 50);
+      }
     },
 
     onTimerUpdate: (white, black) => {
@@ -269,6 +279,9 @@ function setupGameCallbacksUI(): void {
 
     onGameOver: (result) => {
       if (!result) return;
+
+      // Clear any pending premove
+      clearPremove();
 
       const gameState = getOnlineGameState();
       let message = '';
@@ -442,6 +455,7 @@ function closeGameOverAndReturnToLobby(modal: HTMLElement): void {
   modal.remove();
   leaveOnlineGame();
   clearLastGameInfo();
+  clearPremove(); // Clear any pending premove
   setBoardFlipped(false); // Reset board orientation
   renderLobby();
   // Re-setup callbacks since we recreated the lobby
