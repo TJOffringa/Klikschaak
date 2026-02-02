@@ -2,11 +2,11 @@ import { Server, Socket } from 'socket.io';
 import { gameService } from '../../services/game.service.js';
 import { lobbyService } from '../../services/lobby.service.js';
 import type { Player, GameMove, MoveType, Piece } from '../../game/types.js';
-import type { TimeControl } from '../../game/Timer.js';
+import type { TimeControl, TimeControlSettings } from '../../game/Timer.js';
 
 export function setupGameHandlers(io: Server, socket: Socket, player: Player): void {
   // Create a new game
-  socket.on('game:create', (data: { timeControl?: TimeControl }) => {
+  socket.on('game:create', (data: { timeControl?: TimeControl; customSettings?: TimeControlSettings }) => {
     // Check if player is already in a game
     const existingGame = gameService.getGameByPlayer(player.id);
     if (existingGame) {
@@ -15,7 +15,8 @@ export function setupGameHandlers(io: Server, socket: Socket, player: Player): v
     }
 
     const timeControl = data?.timeControl || 'standard';
-    const session = gameService.createGame(timeControl);
+    const customSettings = data?.customSettings;
+    const session = gameService.createGame(timeControl, customSettings);
     const color = gameService.joinGame(session.id, player);
 
     if (!color) {

@@ -1,7 +1,12 @@
 import { getSocket } from './socket.js';
 import type { Board, Piece, PieceColor, MoveType, EnPassantTarget, GameCastlingRights, MoveHistoryEntry } from '../game/types.js';
 
-export type TimeControl = 'bullet' | 'blitz' | 'standard';
+export type TimeControl = 'bullet' | 'blitz-3' | 'blitz-5' | 'rapid-7' | 'standard' | 'custom';
+
+export interface TimeControlSettings {
+  initialTime: number;  // ms
+  increment: number;    // ms
+}
 
 export interface OnlineGameState {
   gameId: string;
@@ -198,7 +203,9 @@ export function setupGameListeners(): void {
 function getInitialTime(timeControl: TimeControl): number {
   switch (timeControl) {
     case 'bullet': return 60 * 1000;
-    case 'blitz': return 3 * 60 * 1000;
+    case 'blitz-3': return 3 * 60 * 1000;
+    case 'blitz-5': return 5 * 60 * 1000;
+    case 'rapid-7': return 7 * 60 * 1000;
     case 'standard': return 7 * 60 * 1000;
     default: return 7 * 60 * 1000;
   }
@@ -230,9 +237,9 @@ export function setGameCallbacks(callbacks: {
 }
 
 // Game actions
-export function createGame(timeControl: TimeControl = 'standard'): void {
+export function createGame(timeControl: TimeControl = 'standard', customSettings?: TimeControlSettings): void {
   const socket = getSocket();
-  socket?.emit('game:create', { timeControl });
+  socket?.emit('game:create', { timeControl, customSettings });
 }
 
 export function joinGame(gameCode: string): void {

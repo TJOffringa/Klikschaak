@@ -192,6 +192,95 @@
   text-transform: none;
 }
 
+/* Custom Time Control */
+.custom-time {
+  margin-top: 8px;
+}
+
+.custom-time.hidden {
+  display: none;
+}
+
+.custom-time-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.custom-time-row input {
+  width: 60px;
+  padding: 6px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.8);
+  color: #f1f5f9;
+  font-size: 13px;
+  text-align: center;
+}
+
+.custom-time-row span {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+/* Challenge Notification */
+.challenge-notification {
+  margin: 12px 0;
+  padding: 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+}
+
+.challenge-notification.hidden {
+  display: none;
+}
+
+.challenge-notification p {
+  margin: 0 0 10px 0;
+  color: #f1f5f9;
+  font-size: 13px;
+}
+
+.challenge-notification p.error {
+  color: #ef4444;
+}
+
+.challenge-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.challenge-received {
+  animation: pulse-challenge 1s ease-in-out infinite;
+}
+
+@keyframes pulse-challenge {
+  0%, 100% { background: rgba(59, 130, 246, 0.1); }
+  50% { background: rgba(59, 130, 246, 0.2); }
+}
+
+/* Challengeable Users */
+.online-user.challengeable {
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.online-user.challengeable:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.challenge-icon {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.online-user.challengeable:hover .challenge-icon {
+  opacity: 1;
+}
+
 .lobby-btn {
   padding: 8px 14px;
   background: linear-gradient(135deg, #3b82f6, #2563eb);
@@ -205,6 +294,15 @@
 
 .lobby-btn:hover {
   filter: brightness(1.1);
+}
+
+.lobby-btn.primary {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.lobby-btn.small {
+  padding: 4px 10px;
+  font-size: 12px;
 }
 
 /* Game Code Display */

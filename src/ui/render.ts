@@ -4,6 +4,17 @@ import * as state from '../game/state';
 import { t, getPieceName, getLanguage, setLanguage } from '../i18n/translations';
 import { handleSquareClick, handleUnklikSelect, executePromotion, movePiece, executeCastling, initGame, toggleAutoPromote } from '../game/actions';
 
+// Board orientation state
+let boardFlipped = false;
+
+export function setBoardFlipped(flipped: boolean): void {
+  boardFlipped = flipped;
+}
+
+export function isBoardFlipped(): boolean {
+  return boardFlipped;
+}
+
 // Make functions available globally for onclick handlers
 (window as any).handleSquareClick = handleSquareClick;
 (window as any).handleUnklikSelect = handleUnklikSelect;
@@ -112,11 +123,15 @@ export function renderBoard(): void {
 
   boardEl.innerHTML = '';
 
-  for (let row = 0; row < 8; row++) {
+  // When flipped, iterate in reverse order
+  const rowOrder = boardFlipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
+  const colOrder = boardFlipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
+
+  for (const row of rowOrder) {
     const rowEl = document.createElement('div');
     rowEl.className = 'board-row';
 
-    for (let col = 0; col < 8; col++) {
+    for (const col of colOrder) {
       const square = document.createElement('div');
       const isLight = (row + col) % 2 === 0;
       square.className = `square ${isLight ? 'light' : 'dark'}`;

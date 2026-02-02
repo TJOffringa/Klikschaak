@@ -1,5 +1,5 @@
 import { GameSession } from '../game/GameSession.js';
-import { TimeControl } from '../game/Timer.js';
+import { TimeControl, TimeControlSettings } from '../game/Timer.js';
 import type { Player, GameResult } from '../game/types.js';
 import { supabase } from '../config/database.js';
 import { updateUserStats } from './auth.service.js';
@@ -9,9 +9,9 @@ class GameService {
   private gameCodeToId: Map<string, string> = new Map();
   private playerToGame: Map<string, string> = new Map();
 
-  createGame(timeControl: TimeControl = 'standard'): GameSession {
+  createGame(timeControl: TimeControl = 'standard', customSettings?: TimeControlSettings): GameSession {
     const id = crypto.randomUUID();
-    const session = new GameSession(id, timeControl);
+    const session = new GameSession(id, timeControl, customSettings);
 
     this.activeSessions.set(id, session);
     this.gameCodeToId.set(session.gameCode, id);

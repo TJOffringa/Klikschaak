@@ -13,7 +13,7 @@ import type {
 } from './types.js';
 import { isWhitePiece, isPawn, getPieceType, coordToNotation, piecesToSymbols, PIECE_SYMBOLS } from './constants.js';
 import { getCombinedMoves, getPieceMoves, wouldBeInCheck, isInCheck, hasLegalMoves } from './moves.js';
-import { GameTimer, TimeControl } from './Timer.js';
+import { GameTimer, TimeControl, TimeControlSettings } from './Timer.js';
 
 function generateGameCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -47,7 +47,7 @@ export class GameSession {
   private onTimerTick: ((white: number, black: number) => void) | null = null;
   private onGameEnd: ((result: GameResult) => void) | null = null;
 
-  constructor(id: string, timeControl: TimeControl = 'standard') {
+  constructor(id: string, timeControl: TimeControl = 'standard', customSettings?: TimeControlSettings) {
     this.id = id;
     this.gameCode = generateGameCode();
     this.timeControl = timeControl;
@@ -56,7 +56,7 @@ export class GameSession {
       white: { kingSide: true, queenSide: true },
       black: { kingSide: true, queenSide: true },
     };
-    this.timer = new GameTimer(timeControl);
+    this.timer = new GameTimer(timeControl, customSettings);
 
     this.timer.setCallbacks(
       (color) => this.handleTimeout(color),

@@ -1,16 +1,18 @@
 import type { PieceColor, TimerState } from './types.js';
 
-export type TimeControl = 'bullet' | 'blitz' | 'standard';
+export type TimeControl = 'bullet' | 'blitz-3' | 'blitz-5' | 'rapid-7' | 'standard' | 'custom';
 
 export interface TimeControlSettings {
   initialTime: number;  // ms
   increment: number;    // ms per move
 }
 
-export const TIME_CONTROLS: Record<TimeControl, TimeControlSettings> = {
-  bullet: { initialTime: 60 * 1000, increment: 0 },           // 1 min
-  blitz: { initialTime: 3 * 60 * 1000, increment: 2 * 1000 }, // 3 min + 2s
-  standard: { initialTime: 7 * 60 * 1000, increment: 5 * 1000 }, // 7 min + 5s (default)
+export const TIME_CONTROLS: Record<Exclude<TimeControl, 'custom'>, TimeControlSettings> = {
+  bullet: { initialTime: 60 * 1000, increment: 0 },              // 1+0
+  'blitz-3': { initialTime: 3 * 60 * 1000, increment: 0 },       // 3+0
+  'blitz-5': { initialTime: 5 * 60 * 1000, increment: 0 },       // 5+0
+  'rapid-7': { initialTime: 7 * 60 * 1000, increment: 0 },       // 7+0
+  standard: { initialTime: 7 * 60 * 1000, increment: 5 * 1000 }, // 7+5 (default)
 };
 
 export class GameTimer {
@@ -23,11 +25,17 @@ export class GameTimer {
   private onTimeout: ((color: PieceColor) => void) | null = null;
   private onTick: ((state: TimerState) => void) | null = null;
 
-  constructor(timeControl: TimeControl = 'standard') {
-    const settings = TIME_CONTROLS[timeControl];
-    this.whiteTime = settings.initialTime;
-    this.blackTime = settings.initialTime;
-    this.increment = settings.increment;
+  constructor(timeControl: TimeControl = 'standard', customSettings?: TimeControlSettings) {
+    if (timeControl === 'custom' && customSettings) {
+      this.whiteTime = customSettings.initialTime;
+      this.blackTime = customSettings.initialTime;
+      this.increment = customSettings.increment;
+    } else {
+      const settings = TIME_CONTROLS[timeControl as Exclude<TimeControl, 'custom'>] || TIME_CONTROLS.standard;
+      this.whiteTime = settings.initialTime;
+      this.blackTime = settings.initialTime;
+      this.increment = settings.increment;
+    }
   }
 
   setCallbacks(
