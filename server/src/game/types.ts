@@ -83,7 +83,7 @@ export interface Player {
 }
 
 export interface GameResult {
-  type: 'checkmate' | 'stalemate' | 'timeout' | 'resignation' | 'disconnect';
+  type: 'checkmate' | 'stalemate' | 'timeout' | 'resignation' | 'disconnect' | 'draw';
   winner: PieceColor | null;
 }
 

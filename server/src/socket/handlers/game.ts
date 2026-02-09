@@ -202,6 +202,43 @@ export function setupGameHandlers(io: Server, socket: Socket, player: Player): v
     session.resign(player.id);
   });
 
+  // Draw offer
+  socket.on('game:draw-offer', (data: { gameId: string }) => {
+    const session = gameService.getGame(data.gameId);
+    if (!session) return;
+
+    const playerColor = session.getPlayerColor(player.id);
+    if (!playerColor) return;
+
+    if (session.offerDraw(player.id)) {
+      // Send to the opponent only
+      const opponentColor = playerColor === 'white' ? 'black' : 'white';
+      const opponent = session.getPlayer(opponentColor);
+      if (opponent) {
+        io.to(`game:${session.id}`).except(socket.id).emit('game:draw-offered', {
+          offeredBy: playerColor,
+        });
+      }
+    }
+  });
+
+  // Draw response
+  socket.on('game:draw-response', (data: { gameId: string; accept: boolean }) => {
+    const session = gameService.getGame(data.gameId);
+    if (!session) return;
+
+    const playerColor = session.getPlayerColor(player.id);
+    if (!playerColor) return;
+
+    if (session.respondDraw(player.id, data.accept)) {
+      if (!data.accept) {
+        // Notify the offerer that draw was declined
+        io.to(`game:${session.id}`).except(socket.id).emit('game:draw-declined');
+      }
+      // If accepted, game:over is emitted via the onGameEnd callback
+    }
+  });
+
   // Get game state (for reconnection)
   socket.on('game:get-state', (data: { gameId: string }) => {
     const session = gameService.getGame(data.gameId);

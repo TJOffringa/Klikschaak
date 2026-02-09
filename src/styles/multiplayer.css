@@ -142,8 +142,15 @@
   border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
+.lobby-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
 .lobby-panel h3 {
-  margin: 0 0 12px 0;
+  margin: 0;
   color: #f1f5f9;
   font-size: 16px;
   display: flex;
@@ -153,6 +160,30 @@
 
 .lobby-panel h3::before {
   content: '🌐';
+}
+
+.lobby-toggle {
+  background: none;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #94a3b8;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lobby-toggle:hover {
+  background: rgba(148, 163, 184, 0.15);
+  color: #f1f5f9;
+}
+
+.lobby-body.collapsed {
+  display: none;
 }
 
 .lobby-actions {
@@ -488,6 +519,7 @@
 /* Game Actions */
 .game-actions {
   display: flex;
+  gap: 8px;
   justify-content: center;
 }
 
@@ -523,11 +555,29 @@
 }
 
 .game-over-modal .modal-content {
+  position: relative;
   background: linear-gradient(135deg, #1e293b, #0f172a);
   padding: 32px 48px;
   border-radius: 16px;
   text-align: center;
   border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.modal-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 28px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.modal-close:hover {
+  color: #f1f5f9;
 }
 
 .game-over-modal h2 {
@@ -737,6 +787,58 @@
   bottom: 0;
   background: rgba(0, 0, 0, 0.6);
   z-index: -1;
+}
+
+/* Draw Notification */
+.draw-notification {
+  margin-top: 8px;
+  padding: 10px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.draw-notification.hidden {
+  display: none;
+}
+
+.draw-notification p {
+  margin: 0 0 8px 0;
+  color: #f1f5f9;
+  font-size: 13px;
+}
+
+.draw-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.game-btn.primary-sm {
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/* Lobby Analysis Button */
+.lobby-analysis {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.lobby-btn.analysis {
+  width: 100%;
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+}
+
+.lobby-btn.analysis:hover {
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
 }
 
 /* Responsive */

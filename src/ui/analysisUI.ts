@@ -40,6 +40,7 @@ import { renderBoard, updateUI } from './render.js';
 import { initGame } from '../game/actions.js';
 import * as state from '../game/state.js';
 import { t } from '../i18n/translations.js';
+import type { ComparisonResult } from '../analysis/engineCompare.js';
 import type { Piece, MoveHistoryEntry } from '../game/types.js';
 
 let analysisContainer: HTMLElement | null = null;
@@ -62,6 +63,7 @@ export function showAnalysisUI(moves?: MoveHistoryEntry[], white?: string, black
   renderAnalysisPanel(white, black);
   renderBoard();
   updateUI();
+  updateEngineComparison();
 }
 
 export function hideAnalysisUI(): void {
@@ -112,6 +114,14 @@ function renderAnalysisPanel(white?: string, black?: string): void {
 
       <div id="editorPanel" class="editor-panel ${isEditorMode() ? '' : 'hidden'}">
         ${renderEditorPanel()}
+      </div>
+
+      <div class="engine-compare" id="engineComparePanel">
+        <div class="compare-header">
+          <span class="compare-status" id="engineStatus">Loading...</span>
+        </div>
+        <div class="compare-counts" id="compareCounts"></div>
+        <div class="compare-diff hidden" id="compareDiff"></div>
       </div>
 
       <div class="analysis-footer">
@@ -325,6 +335,7 @@ function setupEditorListeners(): void {
     clearBoard();
     renderBoard();
     updateFENInput();
+    updateEngineComparison();
   });
 
   // Standard position
@@ -332,6 +343,7 @@ function setupEditorListeners(): void {
     setupStandardPosition();
     renderBoard();
     updateFENInput();
+    updateEngineComparison();
   });
 
   // Load FEN
@@ -341,6 +353,7 @@ function setupEditorListeners(): void {
       const success = setBoardFromFEN(input.value);
       if (success) {
         renderBoard();
+        updateEngineComparison();
       } else {
         alert(t('invalidFEN'));
       }
@@ -389,6 +402,9 @@ function updateAnalysisUI(): void {
   if (counter) {
     counter.textContent = `${getMoveIndex() + 1} / ${getTotalMoves()}`;
   }
+
+  // Update engine comparison
+  updateEngineComparison();
 }
 
 function updateEditorPanel(): void {
@@ -404,6 +420,108 @@ function updateFENInput(): void {
   if (input) {
     input.value = getBoardAsFEN();
   }
+}
+
+function updateEngineComparison(): void {
+  const statusEl = document.getElementById('engineStatus');
+  const countsEl = document.getElementById('compareCounts');
+  const diffEl = document.getElementById('compareDiff');
+
+  if (!statusEl || !countsEl) return;
+
+  statusEl.textContent = 'Comparing...';
+  countsEl.innerHTML = '';
+  if (diffEl) {
+    diffEl.innerHTML = '';
+    diffEl.classList.add('hidden');
+  }
+
+  // Dynamic import to avoid adding engineCompare to the initial module load chain
+  import('../analysis/engineCompare.js').then(({ comparePositionMoves }) =>
+    comparePositionMoves()
+  ).then((result: ComparisonResult) => {
+    // Check elements still exist (user may have navigated away)
+    const status = document.getElementById('engineStatus');
+    const counts = document.getElementById('compareCounts');
+    const diff = document.getElementById('compareDiff');
+    if (!status || !counts) return;
+
+    if (!result.engineOnline) {
+      status.textContent = 'Engine offline';
+      status.className = 'compare-status offline';
+      counts.innerHTML = `<span class="webapp-count">Webapp: ${result.webappCount} moves</span>`;
+      return;
+    }
+
+    if (result.hasMismatch) {
+      status.textContent = 'MISMATCH';
+      status.className = 'compare-status mismatch';
+      counts.innerHTML = `
+        <span class="webapp-count">Webapp: <strong>${result.webappCount}</strong></span>
+        <span class="separator">|</span>
+        <span class="engine-count">Engine: <strong>${result.engineCount}</strong></span>
+        <button id="toggleDiffBtn" class="diff-toggle-btn">
+          Show diff (${result.webappOnly.length + result.engineOnly.length} different)
+        </button>
+      `;
+
+      if (diff) {
+        let diffHtml = '<div class="diff-content">';
+
+        if (result.webappOnly.length > 0) {
+          diffHtml += '<div class="diff-section webapp-only">';
+          diffHtml += `<h5>Only in Webapp (${result.webappOnly.length}):</h5>`;
+          diffHtml += '<div class="move-chips">';
+          for (const uci of result.webappOnly) {
+            diffHtml += `<span class="move-chip webapp">${uci}</span>`;
+          }
+          diffHtml += '</div></div>';
+        }
+
+        if (result.engineOnly.length > 0) {
+          diffHtml += '<div class="diff-section engine-only">';
+          diffHtml += `<h5>Only in Engine (${result.engineOnly.length}):</h5>`;
+          diffHtml += '<div class="move-chips">';
+          for (const uci of result.engineOnly) {
+            diffHtml += `<span class="move-chip engine">${uci}</span>`;
+          }
+          diffHtml += '</div></div>';
+        }
+
+        diffHtml += `<div class="diff-section matching">`;
+        diffHtml += `<h5>Matching (${result.matching.length}):</h5>`;
+        diffHtml += '<div class="move-chips">';
+        for (const uci of result.matching) {
+          diffHtml += `<span class="move-chip match">${uci}</span>`;
+        }
+        diffHtml += '</div></div>';
+
+        diffHtml += '</div>';
+        diff.innerHTML = diffHtml;
+      }
+
+      // Toggle diff visibility
+      document.getElementById('toggleDiffBtn')?.addEventListener('click', () => {
+        if (diff) {
+          diff.classList.toggle('hidden');
+          const btn = document.getElementById('toggleDiffBtn');
+          if (btn) {
+            btn.textContent = diff.classList.contains('hidden')
+              ? `Show diff (${result.webappOnly.length + result.engineOnly.length} different)`
+              : 'Hide diff';
+          }
+        }
+      });
+    } else {
+      status.textContent = 'MATCH';
+      status.className = 'compare-status match';
+      counts.innerHTML = `
+        <span class="webapp-count">Webapp: <strong>${result.webappCount}</strong></span>
+        <span class="separator">|</span>
+        <span class="engine-count">Engine: <strong>${result.engineCount}</strong></span>
+      `;
+    }
+  });
 }
 
 function showExportDialog(): void {

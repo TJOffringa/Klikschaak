@@ -328,6 +328,144 @@
   background: rgba(59, 130, 246, 0.5);
 }
 
+/* Engine Comparison Panel */
+.engine-compare {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.compare-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.compare-status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.compare-status.match {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.compare-status.mismatch {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.compare-status.offline {
+  background: rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+}
+
+.compare-counts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+.compare-counts .separator {
+  color: #475569;
+}
+
+.compare-counts strong {
+  color: #f1f5f9;
+}
+
+.diff-toggle-btn {
+  margin-top: 4px;
+  padding: 4px 10px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.diff-toggle-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.compare-diff {
+  margin-top: 8px;
+}
+
+.compare-diff.hidden {
+  display: none;
+}
+
+.diff-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diff-section h5 {
+  margin: 0 0 4px 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.diff-section.webapp-only h5 {
+  color: #4ade80;
+}
+
+.diff-section.engine-only h5 {
+  color: #f87171;
+}
+
+.diff-section.matching h5 {
+  color: #94a3b8;
+}
+
+.move-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.move-chip {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-family: monospace;
+}
+
+.move-chip.webapp {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.move-chip.engine {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.move-chip.match {
+  background: rgba(148, 163, 184, 0.1);
+  color: #64748b;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
 /* Analysis Footer */
 .analysis-footer {
   display: flex;

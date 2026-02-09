@@ -9,7 +9,7 @@ export interface TimeControlSettings {
 }
 
 export interface GameResult {
-  type: 'checkmate' | 'stalemate' | 'timeout' | 'resignation' | 'disconnect';
+  type: 'checkmate' | 'stalemate' | 'timeout' | 'resignation' | 'disconnect' | 'draw';
   winner: PieceColor | null;
   whitePlayerId?: string;
   blackPlayerId?: string;
@@ -301,6 +301,18 @@ export function resign(): void {
 
   const socket = getSocket();
   socket?.emit('game:resign', { gameId: gameState.gameId });
+}
+
+export function offerDraw(): void {
+  if (!gameState) return;
+  const socket = getSocket();
+  socket?.emit('game:draw-offer', { gameId: gameState.gameId });
+}
+
+export function respondDraw(accept: boolean): void {
+  if (!gameState) return;
+  const socket = getSocket();
+  socket?.emit('game:draw-response', { gameId: gameState.gameId, accept });
 }
 
 export function reconnectToGame(gameId: string): void {

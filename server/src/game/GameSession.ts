@@ -44,6 +44,8 @@ export class GameSession {
   private gameOver: boolean = false;
   private result: GameResult | null = null;
 
+  private drawOffer: string | null = null; // playerId who offered draw
+
   private onTimerTick: ((white: number, black: number) => void) | null = null;
   private onGameEnd: ((result: GameResult) => void) | null = null;
 
@@ -533,6 +535,32 @@ export class GameSession {
       type: 'resignation',
       winner: color === 'white' ? 'black' : 'white'
     });
+  }
+
+  offerDraw(playerId: string): boolean {
+    if (!this.gameStarted || this.gameOver) return false;
+    const color = this.getPlayerColor(playerId);
+    if (!color) return false;
+    this.drawOffer = playerId;
+    return true;
+  }
+
+  respondDraw(playerId: string, accept: boolean): boolean {
+    if (!this.drawOffer || this.gameOver) return false;
+    // Only the other player may respond
+    if (this.drawOffer === playerId) return false;
+    const color = this.getPlayerColor(playerId);
+    if (!color) return false;
+
+    if (accept) {
+      this.endGame({ type: 'draw', winner: null });
+    }
+    this.drawOffer = null;
+    return true;
+  }
+
+  getDrawOffer(): string | null {
+    return this.drawOffer;
   }
 
   private endGame(result: GameResult): void {

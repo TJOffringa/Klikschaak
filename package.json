@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "dev:server": "cd server && npm run dev",
-    "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
+    "dev:engine": "python -m engine.api",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\" \"npm run dev:engine\"",
     "build": "tsc && vite build && node -e \"require('fs').copyFileSync('dist/index.dev.html','dist/index.html')\"",
     "build:server": "cd server && npm run build",
     "preview": "vite preview",

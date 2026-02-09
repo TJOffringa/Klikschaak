@@ -111,6 +111,7 @@ body {
   padding: 12px;
   border-radius: 8px;
   max-width: 100%;
+  touch-action: manipulation;
 }
 
 .board-row {
@@ -482,6 +483,7 @@ body {
 
 /* Game over */
 .game-over-box {
+  position: relative;
   background: linear-gradient(145deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
   padding: 40px;
   border-radius: 16px;
@@ -518,6 +520,23 @@ body {
 .game-over-btn:hover {
   background: #15803d;
   transform: scale(1.05);
+}
+
+.game-over-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 28px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.game-over-close:hover {
+  color: #f1f5f9;
 }
 
 /* Check indicator */

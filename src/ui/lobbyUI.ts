@@ -7,6 +7,8 @@ import {
   isOnline,
   isMyTurn,
   resign,
+  offerDraw,
+  respondDraw,
   leaveOnlineGame,
   TimeControl,
   TimeControlSettings,
@@ -18,7 +20,7 @@ import {
 import { getSocket } from '../multiplayer/socket.js';
 import { getCurrentUser } from '../multiplayer/auth.js';
 import { renderBoard, updateUI, setBoardFlipped } from './render.js';
-import { openAnalysisFromGame } from './analysisUI.js';
+import { openAnalysisFromGame, showAnalysisUI } from './analysisUI.js';
 import { tryExecutePremove } from '../game/actions.js';
 import { clearPremove } from '../multiplayer/premove.js';
 import * as state from '../game/state.js';
@@ -55,7 +57,11 @@ function renderLobby(): void {
 
   lobbyContainer.innerHTML = `
     <div class="lobby-panel">
-      <h3>Online Play</h3>
+      <div class="lobby-header">
+        <h3>Online Play</h3>
+        <button id="lobbyToggleBtn" class="lobby-toggle" title="Minimize">\u2212</button>
+      </div>
+      <div id="lobbyBody" class="lobby-body">
       <div class="lobby-actions">
         <div class="create-game">
           <select id="timeControlSelect">
@@ -87,14 +93,46 @@ function renderLobby(): void {
         <h4>Online (<span id="onlineCount">0</span>)</h4>
         <ul id="onlineUsersList"></ul>
       </div>
+      <div class="lobby-analysis">
+        <button id="lobbyAnalysisBtn" class="lobby-btn analysis">Analyse</button>
+      </div>
+      </div>
     </div>
   `;
+
+  // Start collapsed on mobile
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    const body = document.getElementById('lobbyBody');
+    const btn = document.getElementById('lobbyToggleBtn');
+    if (body && btn) {
+      body.classList.add('collapsed');
+      btn.textContent = '+';
+      btn.title = 'Expand';
+    }
+  }
+
+  // Toggle lobby body
+  document.getElementById('lobbyToggleBtn')?.addEventListener('click', () => {
+    const body = document.getElementById('lobbyBody');
+    const btn = document.getElementById('lobbyToggleBtn');
+    if (body && btn) {
+      const collapsed = body.classList.toggle('collapsed');
+      btn.textContent = collapsed ? '+' : '\u2212';
+      btn.title = collapsed ? 'Expand' : 'Minimize';
+    }
+  });
 
   // Event listeners
   document.getElementById('createGameBtn')?.addEventListener('click', handleCreateGame);
   document.getElementById('joinGameBtn')?.addEventListener('click', handleJoinGame);
   document.getElementById('gameCodeInput')?.addEventListener('keyup', (e) => {
     if (e.key === 'Enter') handleJoinGame();
+  });
+
+  document.getElementById('lobbyAnalysisBtn')?.addEventListener('click', () => {
+    hideLobbyUI();
+    showAnalysisUI();
   });
 
   // Show/hide custom time inputs
@@ -235,8 +273,10 @@ function setupGameCallbacksUI(): void {
               </div>
             </div>
             <div class="game-actions">
+              <button id="drawBtn" class="game-btn">Draw</button>
               <button id="resignBtn" class="game-btn danger">Resign</button>
             </div>
+            <div id="drawNotification" class="draw-notification hidden"></div>
           </div>
         `;
         timerDisplay = document.getElementById('timerDisplay');
@@ -245,6 +285,17 @@ function setupGameCallbacksUI(): void {
             resign();
           }
         });
+        document.getElementById('drawBtn')?.addEventListener('click', () => {
+          offerDraw();
+          const drawBtn = document.getElementById('drawBtn') as HTMLButtonElement;
+          if (drawBtn) {
+            drawBtn.textContent = 'Offered';
+            drawBtn.disabled = true;
+          }
+        });
+
+        // Listen for draw events
+        setupDrawListeners();
       }
 
       // Update board with game state
@@ -304,6 +355,8 @@ function setupGameCallbacksUI(): void {
         message = result.winner === gameState?.myColor
           ? 'Opponent disconnected. You won!'
           : 'Game ended due to disconnection.';
+      } else if (result.type === 'draw') {
+        message = 'Game drawn by agreement.';
       }
 
       // Show game over modal
@@ -396,6 +449,7 @@ function showGameOverModal(message: string): void {
 
   modal.innerHTML = `
     <div class="modal-content">
+      <button class="modal-close" id="modalCloseBtn">\u00d7</button>
       <h2>Game Over</h2>
       <p>${message}</p>
       <div class="modal-buttons">
@@ -407,6 +461,14 @@ function showGameOverModal(message: string): void {
     </div>
   `;
   document.body.appendChild(modal);
+
+  // Close on X or click outside
+  document.getElementById('modalCloseBtn')?.addEventListener('click', () => {
+    closeGameOverAndReturnToLobby(modal);
+  });
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeGameOverAndReturnToLobby(modal);
+  });
 
   // Analysis button handler
   document.getElementById('analyzeGameBtn')?.addEventListener('click', () => {
@@ -541,6 +603,50 @@ function setupRematchListeners(modal: HTMLElement): void {
   // Game started (rematch accepted) - close modal
   socket.on('game:started', () => {
     modal.remove();
+  });
+}
+
+function setupDrawListeners(): void {
+  const socket = getSocket();
+  if (!socket) return;
+
+  socket.off('game:draw-offered');
+  socket.off('game:draw-declined');
+
+  socket.on('game:draw-offered', () => {
+    const notification = document.getElementById('drawNotification');
+    if (notification) {
+      notification.classList.remove('hidden');
+      notification.innerHTML = `
+        <p>Opponent offers a draw</p>
+        <div class="draw-buttons">
+          <button id="acceptDrawBtn" class="game-btn primary-sm">Accept</button>
+          <button id="declineDrawBtn" class="game-btn">Decline</button>
+        </div>
+      `;
+      document.getElementById('acceptDrawBtn')?.addEventListener('click', () => {
+        respondDraw(true);
+        notification.classList.add('hidden');
+      });
+      document.getElementById('declineDrawBtn')?.addEventListener('click', () => {
+        respondDraw(false);
+        notification.classList.add('hidden');
+      });
+    }
+  });
+
+  socket.on('game:draw-declined', () => {
+    const notification = document.getElementById('drawNotification');
+    if (notification) {
+      notification.classList.remove('hidden');
+      notification.innerHTML = '<p>Draw declined</p>';
+      setTimeout(() => notification.classList.add('hidden'), 3000);
+    }
+    const drawBtn = document.getElementById('drawBtn') as HTMLButtonElement;
+    if (drawBtn) {
+      drawBtn.textContent = 'Draw';
+      drawBtn.disabled = false;
+    }
   });
 }
 

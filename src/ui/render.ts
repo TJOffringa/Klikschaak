@@ -5,6 +5,7 @@ import { t, getPieceName, getLanguage, setLanguage } from '../i18n/translations'
 import { handleSquareClick, handleUnklikSelect, executePromotion, movePiece, executeCastling, initGame, toggleAutoPromote, handleRightClick } from '../game/actions';
 import { shouldUseEditorClick, handleEditorBoardClick, openAnalysisFromGame } from './analysisUI.js';
 import { isPremoveSquare } from '../multiplayer/premove.js';
+import { isOnline, isMyTurn, getMyColor } from '../multiplayer/onlineGame.js';
 
 // Board orientation state
 let boardFlipped = false;
@@ -90,7 +91,13 @@ function renderPiece(pieces: Piece[], row: number, col: number, isSelected: bool
   const topSel = isSelected && selectedUnklikPiece !== null && pieces.indexOf(top) === selectedUnklikPiece;
   const wholeSel = isSelected && selectedUnklikPiece === null;
   const currentTurn = state.getCurrentTurn();
-  const canInt = (isWhite && currentTurn === 'white') || (!isWhite && currentTurn === 'black');
+  let canInt: boolean;
+  if (isOnline()) {
+    const myColor = getMyColor();
+    canInt = isMyTurn() && ((isWhite && myColor === 'white') || (!isWhite && myColor === 'black'));
+  } else {
+    canInt = (isWhite && currentTurn === 'white') || (!isWhite && currentTurn === 'black');
+  }
 
   return `<div class="stacked-piece">
     <svg class="stacked-svg" viewBox="0 0 64 64">
@@ -122,6 +129,12 @@ export function renderBoard(): void {
   const board = state.getBoard();
   const selectedSquare = state.getSelectedSquare();
   const validMoves = state.getValidMoves();
+
+  // Lock board height during re-render to prevent mobile scroll shift
+  const prevHeight = boardEl.offsetHeight;
+  if (prevHeight > 0) {
+    boardEl.style.minHeight = prevHeight + 'px';
+  }
 
   boardEl.innerHTML = '';
 
@@ -189,6 +202,9 @@ export function renderBoard(): void {
 
     boardEl.appendChild(rowEl);
   }
+
+  // Release height lock after content is rebuilt
+  boardEl.style.minHeight = '';
 }
 
 export function updateUI(): void {
@@ -297,6 +313,12 @@ export function showGameOver(type: 'checkmate' | 'stalemate', winner: PieceColor
   const box = document.createElement('div');
   box.className = 'game-over-box';
 
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'game-over-close';
+  closeBtn.textContent = '\u00d7';
+  closeBtn.onclick = () => overlay.remove();
+  box.appendChild(closeBtn);
+
   const titleDiv = document.createElement('div');
   titleDiv.className = 'game-over-title';
   titleDiv.textContent = type === 'checkmate' ? t('checkmate') : t('stalemate');
@@ -336,6 +358,9 @@ export function showGameOver(type: 'checkmate' | 'stalemate', winner: PieceColor
   box.appendChild(buttonsDiv);
 
   overlay.appendChild(box);
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove();
+  };
   document.body.appendChild(overlay);
 }
 
