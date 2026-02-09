@@ -40,7 +40,7 @@ import { renderBoard, updateUI } from './render.js';
 import { initGame } from '../game/actions.js';
 import * as state from '../game/state.js';
 import { t } from '../i18n/translations.js';
-import type { ComparisonResult } from '../analysis/engineCompare.js';
+import type { ComparisonResult, EvalResult } from '../analysis/engineCompare.js';
 import type { Piece, MoveHistoryEntry } from '../game/types.js';
 
 let analysisContainer: HTMLElement | null = null;
@@ -64,6 +64,7 @@ export function showAnalysisUI(moves?: MoveHistoryEntry[], white?: string, black
   renderBoard();
   updateUI();
   updateEngineComparison();
+  updateEngineEval();
 }
 
 export function hideAnalysisUI(): void {
@@ -114,6 +115,16 @@ function renderAnalysisPanel(white?: string, black?: string): void {
 
       <div id="editorPanel" class="editor-panel ${isEditorMode() ? '' : 'hidden'}">
         ${renderEditorPanel()}
+      </div>
+
+      <div class="engine-eval" id="engineEvalPanel">
+        <div class="eval-bar-container">
+          <div class="eval-bar" id="evalBar">
+            <div class="eval-fill" id="evalFill"></div>
+          </div>
+          <span class="eval-score" id="evalScore">...</span>
+        </div>
+        <div class="eval-info" id="evalInfo"></div>
       </div>
 
       <div class="engine-compare" id="engineComparePanel">
@@ -403,8 +414,9 @@ function updateAnalysisUI(): void {
     counter.textContent = `${getMoveIndex() + 1} / ${getTotalMoves()}`;
   }
 
-  // Update engine comparison
+  // Update engine comparison and eval
   updateEngineComparison();
+  updateEngineEval();
 }
 
 function updateEditorPanel(): void {
@@ -520,6 +532,69 @@ function updateEngineComparison(): void {
         <span class="separator">|</span>
         <span class="engine-count">Engine: <strong>${result.engineCount}</strong></span>
       `;
+    }
+  });
+}
+
+function formatNodes(n: number): string {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return String(n);
+}
+
+function updateEngineEval(): void {
+  const scoreEl = document.getElementById('evalScore');
+  if (!scoreEl) return;
+
+  scoreEl.textContent = '...';
+
+  import('../analysis/engineCompare.js').then(({ fetchEngineEval, buildFullFEN }) =>
+    fetchEngineEval(buildFullFEN())
+  ).then((result: EvalResult) => {
+    const score = document.getElementById('evalScore');
+    const fill = document.getElementById('evalFill');
+    const info = document.getElementById('evalInfo');
+    if (!score) return;
+
+    if (result.error) {
+      score.textContent = '--';
+      if (fill) fill.style.width = '50%';
+      if (info) info.innerHTML = '<span style="color:#64748b">Engine offline</span>';
+      return;
+    }
+
+    // Score display
+    if (result.scoreType === 'mate') {
+      const prefix = result.score > 0 ? '+' : '';
+      score.textContent = `M${prefix}${result.score}`;
+    } else {
+      const cp = result.score / 100;
+      const prefix = cp > 0 ? '+' : '';
+      score.textContent = `${prefix}${cp.toFixed(1)}`;
+    }
+
+    // Eval bar fill (sigmoid)
+    if (fill) {
+      let pct: number;
+      if (result.scoreType === 'mate') {
+        pct = result.score > 0 ? 95 : 5;
+      } else {
+        pct = 50 + 50 * (2 / (1 + Math.exp(-result.score / 400)) - 1);
+      }
+      fill.style.width = `${Math.max(2, Math.min(98, pct))}%`;
+    }
+
+    // Info line
+    if (info) {
+      let html = '';
+      if (result.bestMove) {
+        html += `<span class="eval-bestmove">Best: ${result.bestMove}</span>`;
+      }
+      if (result.pv.length > 1) {
+        html += `<div class="eval-pv">${result.pv.slice(0, 5).join(' ')}</div>`;
+      }
+      html += `<div class="eval-stats">depth ${result.depth} | ${formatNodes(result.nodes)} nodes | ${formatNodes(result.nps)} nps | ${result.time_ms}ms</div>`;
+      info.innerHTML = html;
     }
   });
 }

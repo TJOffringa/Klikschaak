@@ -328,6 +328,71 @@
   background: rgba(59, 130, 246, 0.5);
 }
 
+/* Engine Evaluation */
+.engine-eval {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.eval-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.eval-bar {
+  flex: 1;
+  height: 20px;
+  background: #1e293b;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.eval-fill {
+  height: 100%;
+  background: #f1f5f9;
+  width: 50%;
+  transition: width 0.3s ease;
+}
+
+.eval-score {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f1f5f9;
+  min-width: 48px;
+  text-align: right;
+  font-family: monospace;
+}
+
+.eval-info {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.eval-bestmove {
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.eval-pv {
+  font-family: monospace;
+  font-size: 11px;
+  color: #cbd5e1;
+  margin-top: 2px;
+}
+
+.eval-stats {
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
 /* Engine Comparison Panel */
 .engine-compare {
   margin-bottom: 16px;

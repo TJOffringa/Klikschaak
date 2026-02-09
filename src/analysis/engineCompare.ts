@@ -268,6 +268,55 @@ export async function checkEngineHealth(): Promise<boolean> {
   }
 }
 
+export interface EvalResult {
+  score: number;
+  scoreType: 'cp' | 'mate';
+  bestMove: string | null;
+  pv: string[];
+  depth: number;
+  nodes: number;
+  nps: number;
+  time_ms: number;
+  error: string | null;
+}
+
+/**
+ * Fetch position evaluation from the Python engine API.
+ */
+export async function fetchEngineEval(fen: string, depth: number = 4): Promise<EvalResult> {
+  try {
+    const response = await fetch(`${ENGINE_URL}/eval`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fen, depth }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    const data = await response.json();
+    if (data.error) {
+      return { score: 0, scoreType: 'cp', bestMove: null, pv: [], depth: 0, nodes: 0, nps: 0, time_ms: 0, error: data.error };
+    }
+
+    return {
+      score: data.score,
+      scoreType: data.scoreType,
+      bestMove: data.bestMove,
+      pv: data.pv,
+      depth: data.depth,
+      nodes: data.nodes,
+      nps: data.nps,
+      time_ms: data.time_ms,
+      error: null,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed') || msg.includes('timeout') || msg.includes('abort')) {
+      return { score: 0, scoreType: 'cp', bestMove: null, pv: [], depth: 0, nodes: 0, nps: 0, time_ms: 0, error: 'Engine offline' };
+    }
+    return { score: 0, scoreType: 'cp', bestMove: null, pv: [], depth: 0, nodes: 0, nps: 0, time_ms: 0, error: msg };
+  }
+}
+
 /**
  * Compare moves from both systems.
  * Uses only the from-to part of UCI for matching (ignoring klik/unklik suffixes

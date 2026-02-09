@@ -8,6 +8,7 @@ import sys
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from .board import Board
 from .movegen import generate_moves
+from .search import SearchEngine, CHECKMATE_SCORE, MAX_DEPTH
 
 
 PORT = 5005
@@ -30,9 +31,11 @@ class EngineHandler(BaseHTTPRequestHandler):
             self._json_response({'error': 'Not found'}, 404)
 
     def do_POST(self):
-        """Handle move generation requests."""
+        """Handle move generation and evaluation requests."""
         if self.path == '/moves':
             self._handle_moves()
+        elif self.path == '/eval':
+            self._handle_eval()
         else:
             self._json_response({'error': 'Not found'}, 404)
 
@@ -67,6 +70,50 @@ class EngineHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._json_response({'error': str(e), 'count': 0, 'moves': []}, 500)
 
+    def _handle_eval(self):
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body)
+            fen = data.get('fen', '')
+            depth = data.get('depth', 4)
+
+            if not fen:
+                self._json_response({'error': 'Missing fen field'}, 400)
+                return
+
+            depth = max(1, min(depth, 10))
+
+            board = Board()
+            board.set_fen(fen)
+
+            searcher = SearchEngine()
+            best_move, info = searcher.search(board, depth)
+
+            score = info.score
+            score_type = 'cp'
+            if abs(score) >= CHECKMATE_SCORE - MAX_DEPTH:
+                score_type = 'mate'
+                if score > 0:
+                    score = (CHECKMATE_SCORE - score + 1) // 2
+                else:
+                    score = -(CHECKMATE_SCORE + score + 1) // 2
+
+            self._json_response({
+                'score': score,
+                'scoreType': score_type,
+                'bestMove': best_move.to_uci() if best_move else None,
+                'pv': [m.to_uci() for m in info.pv],
+                'depth': info.depth,
+                'nodes': info.nodes,
+                'nps': info.nps,
+                'time_ms': info.time_ms,
+                'error': None,
+            })
+
+        except Exception as e:
+            self._json_response({'error': str(e)}, 500)
+
     def _json_response(self, data, status=200):
         self.send_response(status)
         self._cors_headers()
@@ -90,6 +137,7 @@ def main():
     print(f"Klikschaak Engine API running on http://localhost:{PORT}")
     print(f"  GET  /health  - Health check")
     print(f"  POST /moves   - Generate legal moves for a FEN position")
+    print(f"  POST /eval    - Evaluate position (score, best move, PV)")
     print(f"Press Ctrl+C to stop.")
     try:
         server.serve_forever()
