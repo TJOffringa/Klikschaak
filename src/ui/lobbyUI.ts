@@ -216,24 +216,25 @@ function renderEngineGamePanel(): void {
   const engineColor = getEngineColor();
   const playerColor = engineColor === 'white' ? 'Black' : 'White';
 
+  const gameOver = state.isGameOver();
   lobbyContainer.innerHTML = `
     <div class="lobby-panel engine-game-panel">
       <div class="lobby-header">
         <h3>vs Engine</h3>
+        <span class="engine-game-info">You: ${playerColor}</span>
       </div>
       <div class="engine-game-body">
-        <div class="engine-game-info">
-          <span>You play ${playerColor} (depth 8)</span>
-        </div>
         <div id="engineThinking" class="engine-thinking" style="display: ${isEngineThinking() ? 'flex' : 'none'}">
           <span class="thinking-dots"></span>
           <span>Engine thinking...</span>
         </div>
         <div class="engine-game-actions">
-          <button id="engineResignBtn" class="lobby-btn danger" title="Resign">&#9873; Resign</button>
-          <button id="engineDrawBtn" class="lobby-btn" title="Offer Draw">&frac12; Draw</button>
+          ${gameOver ? '' : `
+            <button id="engineResignBtn" class="lobby-btn danger" title="Resign">Resign</button>
+            <button id="engineDrawBtn" class="lobby-btn draw" title="Offer Draw">&frac12; Draw</button>
+          `}
           <button id="engineNewGameBtn" class="lobby-btn engine">New Game</button>
-          <button id="engineStopBtn" class="lobby-btn">Back to Lobby</button>
+          <button id="engineStopBtn" class="lobby-btn secondary">Lobby</button>
         </div>
       </div>
     </div>

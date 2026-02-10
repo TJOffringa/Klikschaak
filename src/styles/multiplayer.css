@@ -877,6 +877,23 @@
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
 }
 
+.lobby-btn.draw {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+}
+
+.lobby-btn.draw:hover {
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.lobby-btn.secondary {
+  background: rgba(71, 85, 105, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.lobby-btn.secondary:hover {
+  background: rgba(100, 116, 139, 0.8);
+}
+
 .engine-status {
   font-size: 11px;
   margin-top: 6px;
@@ -891,6 +908,10 @@
 }
 
 /* Engine Game Panel */
+.engine-game-panel .lobby-header {
+  margin-bottom: 8px;
+}
+
 .engine-game-panel .lobby-header h3::before {
   content: '';
 }
@@ -898,7 +919,7 @@
 .engine-game-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .engine-game-info {
@@ -932,13 +953,15 @@
 }
 
 .engine-game-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 
 .engine-game-actions .lobby-btn {
-  flex: 1;
+  padding: 7px 8px;
+  font-size: 12px;
+  text-align: center;
 }
 
 /* Analysis Button */
@@ -964,6 +987,50 @@
     right: 10px;
     left: 10px;
     width: auto;
+  }
+
+  /* Engine game panel: compact bar above the board instead of overlay */
+  #lobbyContainer:has(.engine-game-panel) {
+    position: fixed;
+    top: 5px;
+    bottom: auto;
+    left: 5px;
+    right: 5px;
+  }
+
+  .engine-game-panel {
+    padding: 8px 12px;
+  }
+
+  .engine-game-panel .lobby-header {
+    margin-bottom: 6px;
+  }
+
+  .engine-game-panel .lobby-header h3 {
+    font-size: 14px;
+  }
+
+  .engine-game-body {
+    gap: 6px;
+  }
+
+  .engine-game-info {
+    font-size: 12px;
+  }
+
+  .engine-thinking {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+
+  .engine-game-actions {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 4px;
+  }
+
+  .engine-game-actions .lobby-btn {
+    padding: 6px 4px;
+    font-size: 11px;
   }
 
   .lobby-panel {
