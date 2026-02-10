@@ -159,7 +159,7 @@
 }
 
 .lobby-panel h3::before {
-  content: '🌐';
+  content: '';
 }
 
 .lobby-toggle {
@@ -825,13 +825,114 @@
   font-size: 12px;
 }
 
-/* Lobby Analysis Button */
-.lobby-analysis {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(148, 163, 184, 0.2);
+/* Lobby Sections */
+.lobby-section {
+  padding: 12px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
 }
 
+.lobby-section:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.section-title {
+  margin: 0 0 8px 0;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Engine Play */
+.engine-play {
+  display: flex;
+  gap: 8px;
+}
+
+.engine-play select {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.8);
+  color: #f1f5f9;
+  font-size: 13px;
+}
+
+.lobby-btn.engine {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.lobby-btn.engine:hover {
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.engine-status {
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+.engine-status.online {
+  color: #22c55e;
+}
+
+.engine-status.offline {
+  color: #ef4444;
+}
+
+/* Engine Game Panel */
+.engine-game-panel .lobby-header h3::before {
+  content: '';
+}
+
+.engine-game-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.engine-game-info {
+  color: #94a3b8;
+  font-size: 13px;
+  text-align: center;
+}
+
+.engine-thinking {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  color: #f59e0b;
+  font-size: 13px;
+}
+
+.thinking-dots::after {
+  content: '';
+  animation: thinking-dots 1.4s infinite;
+}
+
+@keyframes thinking-dots {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60%, 100% { content: '...'; }
+}
+
+.engine-game-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.engine-game-actions .lobby-btn {
+  flex: 1;
+}
+
+/* Analysis Button */
 .lobby-btn.analysis {
   width: 100%;
   background: linear-gradient(135deg, #8b5cf6, #6d28d9);

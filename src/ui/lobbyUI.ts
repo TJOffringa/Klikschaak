@@ -24,6 +24,8 @@ import { openAnalysisFromGame, showAnalysisUI } from './analysisUI.js';
 import { tryExecutePremove } from '../game/actions.js';
 import { clearPremove } from '../multiplayer/premove.js';
 import * as state from '../game/state.js';
+import { startEngineGame, stopEngineGame, isEngineGame, isEngineThinking, getEngineColor } from '../game/engineGame.js';
+import { checkEngineHealth } from '../analysis/engineCompare.js';
 
 let lobbyContainer: HTMLElement | null = null;
 let gameCodeDisplay: HTMLElement | null = null;
@@ -55,47 +57,68 @@ export function hideLobbyUI(): void {
 function renderLobby(): void {
   if (!lobbyContainer) return;
 
+  // Check if we're in an engine game
+  if (isEngineGame()) {
+    renderEngineGamePanel();
+    return;
+  }
+
   lobbyContainer.innerHTML = `
     <div class="lobby-panel">
       <div class="lobby-header">
-        <h3>Online Play</h3>
+        <h3>Klikschaak</h3>
         <button id="lobbyToggleBtn" class="lobby-toggle" title="Minimize">\u2212</button>
       </div>
       <div id="lobbyBody" class="lobby-body">
-      <div class="lobby-actions">
-        <div class="create-game">
-          <select id="timeControlSelect">
-            <option value="bullet">1+0</option>
-            <option value="blitz-3">3+0</option>
-            <option value="blitz-5">5+0</option>
-            <option value="rapid-7">7+0</option>
-            <option value="standard" selected>7+5</option>
-            <option value="custom">Custom</option>
-          </select>
-          <button id="createGameBtn" class="lobby-btn">Create</button>
+        <div class="lobby-section">
+          <h4 class="section-title">Play vs Engine</h4>
+          <div class="engine-play">
+            <select id="engineColorSelect">
+              <option value="white">White</option>
+              <option value="black">Black</option>
+              <option value="random">Random</option>
+            </select>
+            <button id="enginePlayBtn" class="lobby-btn engine">Play</button>
+          </div>
+          <div id="engineStatus" class="engine-status"></div>
         </div>
-        <div class="custom-time hidden" id="customTimeInputs">
-          <div class="custom-time-row">
-            <input type="number" id="customMinutes" placeholder="Min" min="1" max="60" value="10">
-            <span>+</span>
-            <input type="number" id="customIncrement" placeholder="Sec" min="0" max="60" value="0">
+        <div class="lobby-section">
+          <h4 class="section-title">Online Play</h4>
+          <div class="lobby-actions">
+            <div class="create-game">
+              <select id="timeControlSelect">
+                <option value="bullet">1+0</option>
+                <option value="blitz-3">3+0</option>
+                <option value="blitz-5">5+0</option>
+                <option value="rapid-7">7+0</option>
+                <option value="standard" selected>7+5</option>
+                <option value="custom">Custom</option>
+              </select>
+              <button id="createGameBtn" class="lobby-btn">Create</button>
+            </div>
+            <div class="custom-time hidden" id="customTimeInputs">
+              <div class="custom-time-row">
+                <input type="number" id="customMinutes" placeholder="Min" min="1" max="60" value="10">
+                <span>+</span>
+                <input type="number" id="customIncrement" placeholder="Sec" min="0" max="60" value="0">
+              </div>
+            </div>
+            <div class="join-game">
+              <input type="text" id="gameCodeInput" placeholder="Game Code" maxlength="6">
+              <button id="joinGameBtn" class="lobby-btn">Join</button>
+            </div>
+          </div>
+          <div id="gameCodeDisplay" class="game-code-display hidden"></div>
+          <div id="waitingMessage" class="waiting-message hidden"></div>
+          <div id="challengeNotification" class="challenge-notification hidden"></div>
+          <div class="online-users">
+            <h4>Online (<span id="onlineCount">0</span>)</h4>
+            <ul id="onlineUsersList"></ul>
           </div>
         </div>
-        <div class="join-game">
-          <input type="text" id="gameCodeInput" placeholder="Game Code" maxlength="6">
-          <button id="joinGameBtn" class="lobby-btn">Join</button>
+        <div class="lobby-section">
+          <button id="lobbyAnalysisBtn" class="lobby-btn analysis">Analyse</button>
         </div>
-      </div>
-      <div id="gameCodeDisplay" class="game-code-display hidden"></div>
-      <div id="waitingMessage" class="waiting-message hidden"></div>
-      <div id="challengeNotification" class="challenge-notification hidden"></div>
-      <div class="online-users">
-        <h4>Online (<span id="onlineCount">0</span>)</h4>
-        <ul id="onlineUsersList"></ul>
-      </div>
-      <div class="lobby-analysis">
-        <button id="lobbyAnalysisBtn" class="lobby-btn analysis">Analyse</button>
-      </div>
       </div>
     </div>
   `;
@@ -135,6 +158,23 @@ function renderLobby(): void {
     showAnalysisUI();
   });
 
+  // Engine play button
+  document.getElementById('enginePlayBtn')?.addEventListener('click', handleStartEngineGame);
+
+  // Check engine health
+  checkEngineHealth().then(online => {
+    const statusEl = document.getElementById('engineStatus');
+    if (statusEl) {
+      if (online) {
+        statusEl.textContent = 'Engine online';
+        statusEl.className = 'engine-status online';
+      } else {
+        statusEl.textContent = 'Engine offline';
+        statusEl.className = 'engine-status offline';
+      }
+    }
+  });
+
   // Show/hide custom time inputs
   const timeControlSelect = document.getElementById('timeControlSelect') as HTMLSelectElement;
   timeControlSelect?.addEventListener('change', () => {
@@ -148,6 +188,72 @@ function renderLobby(): void {
 
   // Setup challenge listeners
   setupChallengeListeners();
+}
+
+function handleStartEngineGame(): void {
+  const select = document.getElementById('engineColorSelect') as HTMLSelectElement;
+  let color = select?.value || 'white';
+  if (color === 'random') {
+    color = Math.random() < 0.5 ? 'white' : 'black';
+  }
+
+  // Flip board if playing black
+  setBoardFlipped(color === 'black');
+
+  startEngineGame(color as 'white' | 'black');
+  renderEngineGamePanel();
+}
+
+function renderEngineGamePanel(): void {
+  if (!lobbyContainer) return;
+
+  const engineColor = getEngineColor();
+  const playerColor = engineColor === 'white' ? 'Black' : 'White';
+
+  lobbyContainer.innerHTML = `
+    <div class="lobby-panel engine-game-panel">
+      <div class="lobby-header">
+        <h3>vs Engine</h3>
+      </div>
+      <div class="engine-game-body">
+        <div class="engine-game-info">
+          <span>You play ${playerColor} (depth 10)</span>
+        </div>
+        <div id="engineThinking" class="engine-thinking" style="display: ${isEngineThinking() ? 'flex' : 'none'}">
+          <span class="thinking-dots"></span>
+          <span>Engine thinking...</span>
+        </div>
+        <div class="engine-game-actions">
+          <button id="engineNewGameBtn" class="lobby-btn engine">New Game</button>
+          <button id="engineStopBtn" class="lobby-btn">Back to Lobby</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('engineNewGameBtn')?.addEventListener('click', () => {
+    stopEngineGame();
+    renderLobby();
+  });
+
+  document.getElementById('engineStopBtn')?.addEventListener('click', () => {
+    stopEngineGame();
+    setBoardFlipped(false);
+    state.initializeBoard();
+    state.setGameOver(false);
+    // Remove any game over overlay
+    const overlay = document.getElementById('gameOverOverlay');
+    if (overlay) overlay.remove();
+    renderBoard();
+    updateUI();
+    renderLobby();
+    setupGameCallbacksUI();
+    setOnUsersUpdate(renderOnlineUsers);
+  });
+}
+
+export function showEngineGamePanel(): void {
+  renderEngineGamePanel();
 }
 
 function renderOnlineUsers(users: LobbyUser[]): void {

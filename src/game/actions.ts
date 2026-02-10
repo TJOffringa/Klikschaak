@@ -12,10 +12,15 @@ import { getCombinedMoves, getPieceMoves, wouldBeInCheck, isInCheck, hasLegalMov
 import { renderBoard, updateUI, showCheckIndicator, showGameOver, showPromotionDialog, showCastlingChoiceDialog, showEnPassantChoiceDialog } from '../ui/render';
 import { isOnline, isMyTurn, sendMove, getMyColor } from '../multiplayer/onlineGame';
 import { isAnalysisMode, addAnalysisMove } from '../analysis/analysisMode.js';
+import { updateAnalysisUI } from '../ui/analysisUI.js';
 import { hasPremove, setPremove, clearPremove, getPremove } from '../multiplayer/premove.js';
+import { isEngineGame, isEngineTurn, requestEngineMove } from './engineGame.js';
 
 export function handleSquareClick(row: number, col: number): void {
   if (state.isGameOver() && !isAnalysisMode()) return;
+
+  // Block clicks during engine's turn
+  if (isEngineGame() && isEngineTurn()) return;
 
   // In online mode (but not analysis mode), handle premoves when not your turn
   if (isOnline() && !isMyTurn() && !isAnalysisMode()) {
@@ -128,6 +133,9 @@ export function handleSquareClick(row: number, col: number): void {
 export function handleUnklikSelect(row: number, col: number, pieceIndex: number, e: Event): void {
   if (state.isGameOver() && !isAnalysisMode()) return;
   e.stopPropagation();
+
+  // Block during engine's turn
+  if (isEngineGame() && isEngineTurn()) return;
 
   // In online mode (but not analysis mode), only allow on your turn
   if (isOnline() && !isMyTurn() && !isAnalysisMode()) return;
@@ -253,11 +261,21 @@ export function executeCastling(fromRow: number, fromCol: number, toRow: number,
   // If in analysis mode, also record the move there
   if (isAnalysisMode()) {
     addAnalysisMove({ turn, notation });
+    renderBoard();
+    updateUI();
+    checkForCheckmate();
+    updateAnalysisUI();
+    return;
   }
 
   renderBoard();
   updateUI();
   checkForCheckmate();
+
+  // Trigger engine move if it's the engine's turn
+  if (isEngineGame() && isEngineTurn() && !state.isGameOver()) {
+    setTimeout(() => requestEngineMove(), 100);
+  }
 }
 
 export function movePiece(fromRow: number, fromCol: number, toRow: number, toCol: number, moveType: MoveType, promoteTo?: Piece): void {
@@ -486,11 +504,21 @@ function finishMove(moveNotation: string): void {
   // If in analysis mode, also record the move there
   if (isAnalysisMode()) {
     addAnalysisMove({ turn, notation: moveNotation });
+    renderBoard();
+    updateUI();
+    checkForCheckmate();
+    updateAnalysisUI();
+    return;
   }
 
   renderBoard();
   updateUI();
   checkForCheckmate();
+
+  // Trigger engine move if it's the engine's turn
+  if (isEngineGame() && isEngineTurn() && !state.isGameOver()) {
+    setTimeout(() => requestEngineMove(), 100);
+  }
 }
 
 export function executePromotion(piece: Piece): void {
@@ -538,11 +566,21 @@ export function executePromotion(piece: Piece): void {
   // If in analysis mode, also record the move there
   if (isAnalysisMode()) {
     addAnalysisMove({ turn, notation: finalNotation });
+    renderBoard();
+    updateUI();
+    checkForCheckmate();
+    updateAnalysisUI();
+    return;
   }
 
   renderBoard();
   updateUI();
   checkForCheckmate();
+
+  // Trigger engine move if it's the engine's turn
+  if (isEngineGame() && isEngineTurn() && !state.isGameOver()) {
+    setTimeout(() => requestEngineMove(), 100);
+  }
 }
 
 function checkForCheckmate(): void {

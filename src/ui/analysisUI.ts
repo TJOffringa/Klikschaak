@@ -118,13 +118,18 @@ function renderAnalysisPanel(white?: string, black?: string): void {
       </div>
 
       <div class="engine-eval" id="engineEvalPanel">
-        <div class="eval-bar-container">
-          <div class="eval-bar" id="evalBar">
-            <div class="eval-fill" id="evalFill"></div>
-          </div>
-          <span class="eval-score" id="evalScore">...</span>
+        <div class="eval-header">
+          <button id="engineToggleBtn" class="engine-toggle-btn active" title="Toggle engine">&#9881; Engine</button>
         </div>
-        <div class="eval-info" id="evalInfo"></div>
+        <div class="eval-content" id="evalContent">
+          <div class="eval-bar-container">
+            <div class="eval-bar" id="evalBar">
+              <div class="eval-fill" id="evalFill"></div>
+            </div>
+            <span class="eval-score" id="evalScore">...</span>
+          </div>
+          <div class="eval-info" id="evalInfo"></div>
+        </div>
       </div>
 
       <div class="engine-compare" id="engineComparePanel">
@@ -227,6 +232,24 @@ function renderEditorPanel(): string {
 }
 
 function setupAnalysisListeners(): void {
+  // Engine toggle
+  document.getElementById('engineToggleBtn')?.addEventListener('click', () => {
+    engineEnabled = !engineEnabled;
+    const btn = document.getElementById('engineToggleBtn');
+    const content = document.getElementById('evalContent');
+    if (btn) {
+      btn.classList.toggle('active', engineEnabled);
+    }
+    if (content) {
+      content.classList.toggle('hidden', !engineEnabled);
+    }
+    if (engineEnabled) {
+      updateEngineEval();
+    } else if (evalAbortController) {
+      evalAbortController.abort();
+    }
+  });
+
   // Close button
   document.getElementById('closeAnalysisBtn')?.addEventListener('click', () => {
     hideAnalysisUI();
@@ -387,7 +410,7 @@ function setupEditorListeners(): void {
   });
 }
 
-function updateAnalysisUI(): void {
+export function updateAnalysisUI(): void {
   renderBoard();
   updateUI();
 
@@ -542,61 +565,95 @@ function formatNodes(n: number): string {
   return String(n);
 }
 
+// Engine toggle state
+let engineEnabled = true;
+
+// Abort controller for cancelling in-flight eval requests
+let evalAbortController: AbortController | null = null;
+
 function updateEngineEval(): void {
+  if (!engineEnabled) return;
   const scoreEl = document.getElementById('evalScore');
   if (!scoreEl) return;
 
+  // Cancel any previous eval chain
+  if (evalAbortController) {
+    evalAbortController.abort();
+  }
+  evalAbortController = new AbortController();
+  const signal = evalAbortController.signal;
+
   scoreEl.textContent = '...';
 
-  import('../analysis/engineCompare.js').then(({ fetchEngineEval, buildFullFEN }) =>
-    fetchEngineEval(buildFullFEN())
-  ).then((result: EvalResult) => {
-    const score = document.getElementById('evalScore');
-    const fill = document.getElementById('evalFill');
-    const info = document.getElementById('evalInfo');
-    if (!score) return;
+  // Iterative deepening: request depth 1, 2, ... 10, updating UI at each level
+  import('../analysis/engineCompare.js').then(async ({ fetchEngineEval, buildFullFEN }) => {
+    const fen = buildFullFEN();
+    const maxDepth = 10;
 
-    if (result.error) {
-      score.textContent = '--';
-      if (fill) fill.style.width = '50%';
-      if (info) info.innerHTML = '<span style="color:#64748b">Engine offline</span>';
-      return;
-    }
+    for (let d = 1; d <= maxDepth; d++) {
+      if (signal.aborted) return;
 
-    // Score display
-    if (result.scoreType === 'mate') {
-      const prefix = result.score > 0 ? '+' : '';
-      score.textContent = `M${prefix}${result.score}`;
-    } else {
-      const cp = result.score / 100;
-      const prefix = cp > 0 ? '+' : '';
-      score.textContent = `${prefix}${cp.toFixed(1)}`;
-    }
+      const result = await fetchEngineEval(fen, d);
 
-    // Eval bar fill (sigmoid)
-    if (fill) {
-      let pct: number;
-      if (result.scoreType === 'mate') {
-        pct = result.score > 0 ? 95 : 5;
-      } else {
-        pct = 50 + 50 * (2 / (1 + Math.exp(-result.score / 400)) - 1);
+      if (signal.aborted) return;
+      if (result.error) {
+        // Only show offline if we have no results yet (depth 1 failed)
+        if (d === 1) {
+          const score = document.getElementById('evalScore');
+          const fill = document.getElementById('evalFill');
+          const info = document.getElementById('evalInfo');
+          if (score) score.textContent = '--';
+          if (fill) fill.style.width = '50%';
+          if (info) info.innerHTML = '<span style="color:#64748b">Engine offline</span>';
+        }
+        return;
       }
-      fill.style.width = `${Math.max(2, Math.min(98, pct))}%`;
-    }
 
-    // Info line
-    if (info) {
-      let html = '';
-      if (result.bestMove) {
-        html += `<span class="eval-bestmove">Best: ${result.bestMove}</span>`;
-      }
-      if (result.pv.length > 1) {
-        html += `<div class="eval-pv">${result.pv.slice(0, 5).join(' ')}</div>`;
-      }
-      html += `<div class="eval-stats">depth ${result.depth} | ${formatNodes(result.nodes)} nodes | ${formatNodes(result.nps)} nps | ${result.time_ms}ms</div>`;
-      info.innerHTML = html;
+      updateEvalDisplay(result);
     }
   });
+}
+
+function updateEvalDisplay(result: EvalResult): void {
+  const score = document.getElementById('evalScore');
+  const fill = document.getElementById('evalFill');
+  const info = document.getElementById('evalInfo');
+  if (!score) return;
+
+  // Score display
+  if (result.scoreType === 'mate') {
+    const prefix = result.score > 0 ? '+' : '';
+    score.textContent = `M${prefix}${result.score}`;
+  } else {
+    const cp = result.score / 100;
+    const prefix = cp > 0 ? '+' : '';
+    score.textContent = `${prefix}${cp.toFixed(1)}`;
+  }
+
+  // Eval bar fill (sigmoid)
+  if (fill) {
+    let pct: number;
+    if (result.scoreType === 'mate') {
+      pct = result.score > 0 ? 95 : 5;
+    } else {
+      pct = 50 + 50 * (2 / (1 + Math.exp(-result.score / 400)) - 1);
+    }
+    fill.style.width = `${Math.max(2, Math.min(98, pct))}%`;
+  }
+
+  // Info line
+  if (info) {
+    let html = '';
+    if (result.bestMove) {
+      html += `<span class="eval-bestmove">Best: ${result.bestMove}</span>`;
+    }
+    if (result.pv.length > 1) {
+      html += `<div class="eval-pv">${result.pv.slice(0, 5).join(' ')}</div>`;
+    }
+    html += `<div class="eval-stats">depth ${result.depth} | ${formatNodes(result.nodes)} nodes | ${formatNodes(result.nps)} nps | ${result.time_ms}ms</div>`;
+    info.innerHTML = html;
+  }
+
 }
 
 function showExportDialog(): void {
