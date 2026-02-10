@@ -43,6 +43,9 @@ class Board:
         # Bit X set = pawn on file X hasn't moved from starting rank
         self.unmoved_pawns: List[int] = [0xFF, 0xFF]
 
+        # Zobrist hash (updated incrementally by make/unmake)
+        self.zobrist_hash: int = 0
+
         # Move history for undo
         self.history: List[dict] = []
 
@@ -57,6 +60,7 @@ class Board:
         b.fullmove = self.fullmove
         b.king_sq = self.king_sq.copy()
         b.unmoved_pawns = self.unmoved_pawns.copy()
+        b.zobrist_hash = self.zobrist_hash
         return b
 
     def reset(self):
@@ -73,6 +77,7 @@ class Board:
         self.fullmove = 1
         self.king_sq = [Square.NONE, Square.NONE]
         self.unmoved_pawns = [0x00, 0x00]
+        self.zobrist_hash = 0
         self.history = []
 
     # -------------------------------------------------------------------------

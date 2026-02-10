@@ -93,6 +93,7 @@ def compute_zobrist(board: Board) -> int:
     if board.ep_square is not None:
         h ^= ZOBRIST.ep_keys[board.ep_square & 7]
 
+    board.zobrist_hash = h
     return h
 
 
@@ -100,6 +101,12 @@ class SearchEngine:
     """
     Alpha-beta search engine for Klikschaak.
     """
+
+    # Futility pruning margins by depth (centipawns)
+    FUTILITY_MARGINS = [0, 100, 300]
+
+    # Aspiration window size
+    ASPIRATION_WINDOW = 50
 
     def __init__(self):
         self.nodes = 0
@@ -117,33 +124,67 @@ class SearchEngine:
         # History heuristic
         self.history: List[List[int]] = [[0] * 64 for _ in range(64)]
 
+        # Countermove heuristic: countermove[from_sq][to_sq] = best response
+        self.countermove: List[List[Optional[Move]]] = [[None] * 64 for _ in range(64)]
+
+        # Previous move (for countermove heuristic)
+        self.prev_move: Optional[Move] = None
+
     def clear(self):
         """Clear search state"""
         self.tt.clear()
         self.killers = [[None, None] for _ in range(MAX_DEPTH)]
         self.history = [[0] * 64 for _ in range(64)]
+        self.countermove = [[None] * 64 for _ in range(64)]
+
+    def _decay_history(self):
+        """Decay history scores by half each ID iteration"""
+        for i in range(64):
+            for j in range(64):
+                self.history[i][j] >>= 1
 
     def search(self, board: Board, depth: int = 6,
                time_limit_ms: int = None) -> Tuple[Move, SearchInfo]:
         """
-        Search for the best move using iterative deepening.
+        Search for the best move using iterative deepening with aspiration windows.
         """
         self.nodes = 0
         self.start_time = time.time() * 1000
         self.max_time_ms = time_limit_ms or float('inf')
         self.stop_search = False
 
+        # Initialize Zobrist hash once
+        compute_zobrist(board)
+
         info = SearchInfo()
         best_move = None
+        prev_score = 0
 
         # Iterative deepening
         for d in range(1, depth + 1):
             if self.stop_search:
                 break
 
-            score, pv = self.alpha_beta(board, d, -INFINITY, INFINITY, [])
+            # Decay history scores each iteration
+            self._decay_history()
+
+            # Aspiration windows after depth 1
+            if d <= 1:
+                score, pv = self.alpha_beta(board, d, -INFINITY, INFINITY, [], None)
+            else:
+                window = self.ASPIRATION_WINDOW
+                alpha_w = prev_score - window
+                beta_w = prev_score + window
+
+                score, pv = self.alpha_beta(board, d, alpha_w, beta_w, [], None)
+
+                if not self.stop_search:
+                    # Fail-low or fail-high: re-search with full window
+                    if score <= alpha_w or score >= beta_w:
+                        score, pv = self.alpha_beta(board, d, -INFINITY, INFINITY, [], None)
 
             if not self.stop_search:
+                prev_score = score
                 info.depth = d
                 info.score = score if board.turn == Color.WHITE else -score
                 info.pv = pv[:]
@@ -167,10 +208,9 @@ class SearchEngine:
         return best_move, info
 
     def alpha_beta(self, board: Board, depth: int, alpha: int, beta: int,
-                   pv: List[Move]) -> Tuple[int, List[Move]]:
+                   pv: List[Move], prev_move: Optional[Move]) -> Tuple[int, List[Move]]:
         """
-        Alpha-beta search with PV tracking.
-        Uses make/unmake instead of board.copy() for performance.
+        Alpha-beta search with PV tracking, LMR, and futility pruning.
         """
         self.nodes += 1
 
@@ -190,7 +230,7 @@ class SearchEngine:
             return score, []
 
         # TT lookup
-        tt_key = compute_zobrist(board)
+        tt_key = board.zobrist_hash
         tt_entry = self.tt.get(tt_key)
         tt_move = None
 
@@ -206,17 +246,29 @@ class SearchEngine:
                         return beta, []
             tt_move = tt_entry.best_move
 
+        in_check = is_in_check(board, board.turn)
+
+        # Futility pruning: at shallow depths, if static eval + margin < alpha,
+        # skip quiet moves (captures are still searched)
+        futile = False
+        if not in_check and depth <= 2:
+            static_eval = evaluate(board)
+            if board.turn == Color.BLACK:
+                static_eval = -static_eval
+            if static_eval + self.FUTILITY_MARGINS[depth] <= alpha:
+                futile = True
+
         # Generate pseudo-legal moves
         moves = generate_moves(board, legal_only=False)
 
         if not moves:
-            if is_in_check(board, board.turn):
+            if in_check:
                 return -CHECKMATE_SCORE + (MAX_DEPTH - depth), []
             else:
                 return DRAW_SCORE, []
 
         # Move ordering
-        moves = self.order_moves(board, moves, depth, tt_move)
+        moves = self.order_moves(board, moves, depth, tt_move, prev_move)
 
         original_alpha = alpha
         best_score = -INFINITY
@@ -224,7 +276,15 @@ class SearchEngine:
         best_pv = []
         legal_count = 0
 
-        for i, move in enumerate(moves):
+        for move in moves:
+            is_cap = self.is_capture(board, move)
+
+            # Futility pruning: skip quiet moves at shallow depths
+            if futile and not is_cap and not in_check:
+                # Still need to check at least one move for legality
+                if legal_count > 0:
+                    continue
+
             # Make move on the board (in-place)
             undo = make_move(board, move)
 
@@ -234,23 +294,36 @@ class SearchEngine:
                 continue
 
             legal_count += 1
+            gives_check = is_in_check(board, board.turn)
 
-            # Search
+            # Search with LMR and PVS
             if legal_count == 1:
                 # Full window search for first legal move
                 score, child_pv = self.alpha_beta(board, depth - 1,
-                                                   -beta, -alpha, [])
+                                                   -beta, -alpha, [], move)
                 score = -score
             else:
-                # Null window search
-                score, _ = self.alpha_beta(board, depth - 1,
-                                           -alpha - 1, -alpha, [])
+                # Late Move Reductions: reduce depth for late quiet moves
+                reduction = 0
+                if (depth >= 3 and legal_count > 3 and
+                        not is_cap and not in_check and not gives_check):
+                    reduction = 1
+
+                # Null window search (possibly with reduction)
+                score, _ = self.alpha_beta(board, depth - 1 - reduction,
+                                           -alpha - 1, -alpha, [], move)
                 score = -score
 
-                # Re-search if necessary
+                # Re-search at full depth if reduced search improved alpha
+                if reduction > 0 and score > alpha:
+                    score, _ = self.alpha_beta(board, depth - 1,
+                                               -alpha - 1, -alpha, [], move)
+                    score = -score
+
+                # Re-search with full window if necessary
                 if alpha < score < beta:
                     score, child_pv = self.alpha_beta(board, depth - 1,
-                                                       -beta, -score, [])
+                                                       -beta, -score, [], move)
                     score = -score
                 else:
                     child_pv = []
@@ -270,16 +343,19 @@ class SearchEngine:
                 alpha = score
 
             if alpha >= beta:
-                # Beta cutoff - update killers and history
-                if move not in self.killers[depth]:
-                    self.killers[depth][1] = self.killers[depth][0]
-                    self.killers[depth][0] = move
-                self.history[move.from_sq][move.to_sq] += depth * depth
+                # Beta cutoff - update killers, history, and countermove
+                if not is_cap:
+                    if move not in self.killers[depth]:
+                        self.killers[depth][1] = self.killers[depth][0]
+                        self.killers[depth][0] = move
+                    self.history[move.from_sq][move.to_sq] += depth * depth
+                    if prev_move is not None:
+                        self.countermove[prev_move.from_sq][prev_move.to_sq] = move
                 break
 
         # No legal moves found
         if legal_count == 0:
-            if is_in_check(board, board.turn):
+            if in_check:
                 return -CHECKMATE_SCORE + (MAX_DEPTH - depth), []
             else:
                 return DRAW_SCORE, []
@@ -378,9 +454,15 @@ class SearchEngine:
         return victim_value * 10 - attacker_value
 
     def order_moves(self, board: Board, moves: List[Move], depth: int,
-                    tt_move: Optional[Move]) -> List[Move]:
+                    tt_move: Optional[Move],
+                    prev_move: Optional[Move] = None) -> List[Move]:
         """Order moves for better pruning"""
         scored_moves = []
+
+        # Get countermove for previous opponent move
+        cm = None
+        if prev_move is not None:
+            cm = self.countermove[prev_move.from_sq][prev_move.to_sq]
 
         for move in moves:
             score = 0
@@ -396,6 +478,9 @@ class SearchEngine:
                 score = 900000
             elif depth < MAX_DEPTH and move == self.killers[depth][1]:
                 score = 800000
+            # Countermove
+            elif cm is not None and move == cm:
+                score = 700000
             # History heuristic
             else:
                 score = self.history[move.from_sq][move.to_sq]

@@ -108,58 +108,142 @@ def evaluate(board: Board) -> int:
     Evaluate position from White's perspective.
     Returns score in centipawns.
     Positive = good for White, Negative = good for Black.
+    Single-pass evaluation: material, PST, stacks, endgame detection all in one loop.
     """
     score = 0
+    squares = board.squares
 
-    # Determine game phase for king table selection
-    endgame = is_endgame(board)
-    king_table = KING_ENDGAME_TABLE if endgame else KING_MIDDLEGAME_TABLE
+    # First pass: detect endgame + material + PST + stacks + pawn file data
+    queens = 0
+    minors = 0
+    king_pst_w = 0
+    king_pst_b = 0
+    king_sq_w_local = 0
+    king_sq_b_local = 0
 
-    # Material and piece-square tables
-    material_white = 0
-    material_black = 0
+    # Pawn file bitmasks for passed pawn eval
+    w_pawn_files = [0] * 8
+    b_pawn_files = [0] * 8
+    w_pawn_sqs = []
+    b_pawn_sqs = []
 
     for sq in range(64):
-        stack = board.stack_at(sq)
-        for piece in stack.pieces:
-            color = piece_color(piece)
-            pt = piece_type(piece)
+        pieces = squares[sq].pieces
+        npieces = len(pieces)
+        if npieces == 0:
+            continue
+
+        for piece in pieces:
+            pval = int(piece)
+            is_white = pval < 8
+            pt = pval & 7  # piece_type inline
 
             # Material value
             value = PIECE_VALUES[pt]
-            if color == Color.WHITE:
-                material_white += value
+            if is_white:
+                score += value
             else:
-                material_black += value
+                score -= value
 
-            # Piece-square table value
-            if pt == PieceType.KING:
-                table = king_table
-            elif pt in PST:
+            # PST (defer king to after endgame detection)
+            if pt == 6:  # KING
+                if is_white:
+                    king_sq_w_local = sq
+                else:
+                    king_sq_b_local = sq
+            elif pt <= 5 and pt >= 1:
                 table = PST[pt]
-            else:
-                continue
+                table_sq = sq if is_white else sq ^ 56
+                if is_white:
+                    score += table[table_sq]
+                else:
+                    score -= table[table_sq]
 
-            table_sq = sq if color == Color.WHITE else mirror_square(sq)
-            pst_value = table[table_sq]
+            # Endgame detection counts
+            if pt == 5:  # QUEEN
+                queens += 1
+            elif pt in (2, 3, 4):  # KNIGHT, BISHOP, ROOK
+                minors += 1
 
-            if color == Color.WHITE:
-                score += pst_value
-            else:
-                score -= pst_value
+            # Pawn tracking for passed pawn eval
+            if pt == 1:  # PAWN
+                f = sq & 7
+                r = sq >> 3
+                if is_white:
+                    w_pawn_files[f] |= (1 << r)
+                    w_pawn_sqs.append(sq)
+                else:
+                    b_pawn_files[f] |= (1 << r)
+                    b_pawn_sqs.append(sq)
 
-    score += material_white - material_black
+        # Stack evaluation (inline)
+        if npieces == 2:
+            bottom = pieces[0]
+            top = pieces[1]
+            b_color = int(bottom) < 8
+            t_color = int(top) < 8
+            if b_color == t_color:
+                bottom_pt = int(bottom) & 7
+                top_pt = int(top) & 7
+                stack_value = 0
+                if bottom_pt in (2, 3) and top_pt in (2, 3):
+                    stack_value += 15
+                if bottom_pt in (2, 3) and top_pt == 4:
+                    stack_value += 20
+                if top_pt == 5 or bottom_pt == 5:
+                    stack_value += 5
+                if bottom_pt == 1:
+                    stack_value += 10
+                if top_pt != 1 and bottom_pt == 1:
+                    stack_value -= 5
+                if b_color:
+                    score += stack_value
+                else:
+                    score -= stack_value
 
-    # Klikschaak-specific evaluation
+    # Endgame detection
+    endgame = queens == 0 or (queens == 1 and minors <= 1)
+    king_table = KING_ENDGAME_TABLE if endgame else KING_MIDDLEGAME_TABLE
 
-    # Stack bonus/penalty
-    score += evaluate_stacks(board)
-
-    # Mobility (expensive, use sparingly)
-    # score += evaluate_mobility(board)
+    # Add king PST
+    score += king_table[king_sq_w_local]
+    score -= king_table[king_sq_b_local ^ 56]
 
     # King safety
     score += evaluate_king_safety(board)
+
+    # Passed pawn evaluation (using pre-computed file data)
+    for sq in w_pawn_sqs:
+        file = sq & 7
+        rank = sq >> 3
+        ahead_mask = ~((1 << (rank + 1)) - 1) & 0xFF
+        is_passed = True
+        for f in range(max(0, file - 1), min(8, file + 2)):
+            if b_pawn_files[f] & ahead_mask:
+                is_passed = False
+                break
+        if is_passed:
+            advancement = rank - 1
+            bonus = PASSED_PAWN_BONUS[min(advancement, 6)] if advancement >= 0 else 0
+            if len(squares[sq].pieces) >= 2:
+                bonus += 15
+            score += bonus
+
+    for sq in b_pawn_sqs:
+        file = sq & 7
+        rank = sq >> 3
+        ahead_mask = (1 << rank) - 1
+        is_passed = True
+        for f in range(max(0, file - 1), min(8, file + 2)):
+            if w_pawn_files[f] & ahead_mask:
+                is_passed = False
+                break
+        if is_passed:
+            advancement = 6 - rank
+            bonus = PASSED_PAWN_BONUS[min(advancement, 6)] if advancement >= 0 else 0
+            if len(squares[sq].pieces) >= 2:
+                bonus += 15
+            score -= bonus
 
     # Check bonus
     if is_in_check(board, Color.BLACK):
@@ -222,6 +306,79 @@ def evaluate_stacks(board: Board) -> int:
             score += stack_value
         else:
             score -= stack_value
+
+    return score
+
+
+# Passed pawn bonus by rank advancement (from own side)
+# Index = ranks advanced (0 = starting rank, 6 = one before promotion)
+PASSED_PAWN_BONUS = [0, 10, 15, 25, 45, 75, 120]
+
+
+def evaluate_passed_pawns(board: Board) -> int:
+    """
+    Evaluate passed pawns (no enemy pawns blocking or on adjacent files ahead).
+    Uses bitmask per file for fast lookup.
+    """
+    score = 0
+    squares = board.squares
+
+    # Build per-file pawn rank sets: white_pawns[file] = set of ranks,
+    # black_pawns[file] = set of ranks
+    # Use bitmask: bit i set = pawn on rank i
+    w_pawn_files = [0] * 8
+    b_pawn_files = [0] * 8
+    w_pawn_sqs = []
+    b_pawn_sqs = []
+
+    for sq in range(64):
+        for piece in squares[sq].pieces:
+            if piece == Piece.W_PAWN:
+                f = sq & 7
+                r = sq >> 3
+                w_pawn_files[f] |= (1 << r)
+                w_pawn_sqs.append(sq)
+            elif piece == Piece.B_PAWN:
+                f = sq & 7
+                r = sq >> 3
+                b_pawn_files[f] |= (1 << r)
+                b_pawn_sqs.append(sq)
+
+    # Check white pawns for being passed
+    for sq in w_pawn_sqs:
+        file = sq & 7
+        rank = sq >> 3
+        # Mask of ranks ahead: bits rank+1 through 7
+        ahead_mask = ~((1 << (rank + 1)) - 1) & 0xFF
+        is_passed = True
+        for f in range(max(0, file - 1), min(8, file + 2)):
+            if b_pawn_files[f] & ahead_mask:
+                is_passed = False
+                break
+        if is_passed:
+            advancement = rank - 1
+            bonus = PASSED_PAWN_BONUS[min(advancement, 6)] if advancement >= 0 else 0
+            if len(squares[sq].pieces) >= 2:
+                bonus += 15
+            score += bonus
+
+    # Check black pawns for being passed
+    for sq in b_pawn_sqs:
+        file = sq & 7
+        rank = sq >> 3
+        # Mask of ranks ahead (for black, lower ranks): bits 0 through rank-1
+        ahead_mask = (1 << rank) - 1
+        is_passed = True
+        for f in range(max(0, file - 1), min(8, file + 2)):
+            if w_pawn_files[f] & ahead_mask:
+                is_passed = False
+                break
+        if is_passed:
+            advancement = 6 - rank
+            bonus = PASSED_PAWN_BONUS[min(advancement, 6)] if advancement >= 0 else 0
+            if len(squares[sq].pieces) >= 2:
+                bonus += 15
+            score -= bonus
 
     return score
 

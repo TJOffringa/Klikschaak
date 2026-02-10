@@ -8,6 +8,16 @@ from .types import (
 )
 from .board import Board
 
+# Cached reference to ZOBRIST keys (populated lazily to avoid circular import)
+_ZOBRIST = None
+
+def _get_zobrist():
+    global _ZOBRIST
+    if _ZOBRIST is None:
+        from .search import ZOBRIST
+        _ZOBRIST = ZOBRIST
+    return _ZOBRIST
+
 # Direction offsets for pieces
 KNIGHT_OFFSETS = [-17, -15, -10, -6, 6, 10, 15, 17]
 KING_OFFSETS = [-9, -8, -7, -1, 1, 7, 8, 9]
@@ -46,7 +56,7 @@ _init_move_tables()
 class UndoInfo:
     __slots__ = ['modified', 'castling', 'ep_square', 'halfmove_clock',
                  'king_sq_w', 'king_sq_b', 'fullmove',
-                 'unmoved_pawns_w', 'unmoved_pawns_b']
+                 'unmoved_pawns_w', 'unmoved_pawns_b', 'zobrist_hash']
 
     def __init__(self):
         self.modified = []  # list of (sq, old_pieces_list) tuples
@@ -58,6 +68,7 @@ class UndoInfo:
         self.fullmove = 1
         self.unmoved_pawns_w = 0xFF
         self.unmoved_pawns_b = 0xFF
+        self.zobrist_hash = 0
 
 
 def sliding_moves(board: Board, sq: int, directions: List[int]) -> List[int]:
@@ -642,6 +653,7 @@ def make_move(board: Board, move: Move) -> UndoInfo:
     undo.fullmove = board.fullmove
     undo.unmoved_pawns_w = board.unmoved_pawns[0]
     undo.unmoved_pawns_b = board.unmoved_pawns[1]
+    undo.zobrist_hash = board.zobrist_hash
 
     # Always save from and to squares
     undo.modified = [(from_sq, squares[from_sq].pieces[:]),
@@ -821,6 +833,33 @@ def make_move(board: Board, move: Move) -> UndoInfo:
     if board.turn == Color.WHITE:
         board.fullmove += 1
 
+    # Incremental Zobrist hash update
+    zob = _get_zobrist()
+    h = undo.zobrist_hash
+    pk = zob.piece_keys
+
+    # XOR out old pieces on modified squares, XOR in new pieces
+    for msq, old_pieces in undo.modified:
+        for i in range(len(old_pieces)):
+            h ^= pk[old_pieces[i]][i][msq]
+        new_pieces = squares[msq].pieces
+        for i in range(len(new_pieces)):
+            h ^= pk[new_pieces[i]][i][msq]
+
+    # Update castling hash (XOR is self-inverse, so XOR old then new)
+    h ^= zob.castling_keys[undo.castling] ^ zob.castling_keys[board.castling]
+
+    # Update en passant hash
+    if undo.ep_square is not None:
+        h ^= zob.ep_keys[undo.ep_square & 7]
+    if board.ep_square is not None:
+        h ^= zob.ep_keys[board.ep_square & 7]
+
+    # Toggle turn
+    h ^= zob.turn_key
+
+    board.zobrist_hash = h
+
     return undo
 
 
@@ -839,4 +878,5 @@ def unmake_move(board: Board, move: Move, undo: UndoInfo):
     board.fullmove = undo.fullmove
     board.unmoved_pawns[0] = undo.unmoved_pawns_w
     board.unmoved_pawns[1] = undo.unmoved_pawns_b
+    board.zobrist_hash = undo.zobrist_hash
     board.turn = board.turn.opposite()
