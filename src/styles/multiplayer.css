@@ -977,25 +977,27 @@
 /* Responsive */
 @media (max-width: 768px) {
   #authContainer {
-    top: 5px;
-    right: 5px;
+    position: static !important;
+    order: -2;
+    align-self: flex-end;
+    margin: 5px 5px 0;
+  }
+
+  /* On mobile: panels flow in the page instead of floating over the board */
+  body {
+    display: flex;
+    flex-direction: column;
   }
 
   #lobbyContainer {
-    top: auto;
-    bottom: 10px;
-    right: 10px;
-    left: 10px;
-    width: auto;
+    position: static !important;
+    width: auto !important;
+    margin: 5px 0;
   }
 
-  /* Engine game panel: compact bar above the board instead of overlay */
+  /* Engine game panel appears above the board */
   #lobbyContainer:has(.engine-game-panel) {
-    position: fixed;
-    top: 5px;
-    bottom: auto;
-    left: 5px;
-    right: 5px;
+    order: -1;
   }
 
   .engine-game-panel {

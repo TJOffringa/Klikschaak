@@ -653,13 +653,18 @@
 
 /* Responsive */
 @media (max-width: 768px) {
+  /* On mobile: flow in the page, never overlap the board */
   #analysisContainer {
-    top: auto;
-    bottom: 10px;
-    right: 10px;
-    left: 10px;
-    width: auto;
-    max-height: 50vh;
+    position: static !important;
+    width: auto !important;
+    margin: 5px 0;
+    max-height: none;
+  }
+
+  .analysis-mode-btn {
+    position: static !important;
+    margin: 5px 0;
+    align-self: flex-start;
   }
 
   .analysis-dialog {
