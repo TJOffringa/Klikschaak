@@ -1,6 +1,6 @@
 /**
  * Engine Comparison Module
- * Bridges the webapp's JS move generation with the Python engine API
+ * Bridges the webapp's JS move generation with the Rust engine (WASM or HTTP API)
  * to compare legal move counts and identify discrepancies.
  */
 import type { Piece } from '../game/types.js';
@@ -9,6 +9,157 @@ import { isWhitePiece, isPawn, getPieceType } from '../game/constants.js';
 import * as state from '../game/state.js';
 
 const ENGINE_URL = 'http://localhost:5005';
+
+// --- WASM engine management ---
+// Strategy: try Web Worker first (off main thread), fall back to direct WASM (main thread)
+type WasmMode = 'loading' | 'worker' | 'direct' | 'failed';
+let wasmMode: WasmMode = 'loading';
+let wasmWorker: Worker | null = null;
+let nextRequestId = 0;
+const pendingRequests = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void }>();
+
+// Direct WASM module (fallback when Worker doesn't work)
+let wasmEvalDirect: ((fen: string, depth: number) => string) | null = null;
+let wasmMovesDirect: ((fen: string) => string) | null = null;
+
+function initWasmWorker(): void {
+  try {
+    wasmWorker = new Worker(
+      new URL('./engineWorker.ts', import.meta.url),
+      { type: 'module' }
+    );
+
+    // If worker doesn't report ready within 5s, fall back to direct
+    const workerTimeout = setTimeout(() => {
+      if (wasmMode === 'loading') {
+        console.warn('[Engine] Worker timeout, trying direct WASM');
+        wasmWorker?.terminate();
+        wasmWorker = null;
+        initWasmDirect();
+      }
+    }, 5000);
+
+    wasmWorker.onmessage = (e: MessageEvent) => {
+      const { id, result, error, type } = e.data;
+      if (type === 'ready') {
+        clearTimeout(workerTimeout);
+        wasmMode = 'worker';
+        console.log('[Engine] WASM worker ready');
+        return;
+      }
+      if (type === 'error') {
+        clearTimeout(workerTimeout);
+        console.warn('[Engine] Worker init failed:', error, '- trying direct WASM');
+        wasmWorker = null;
+        initWasmDirect();
+        return;
+      }
+      const pending = pendingRequests.get(id);
+      if (pending) {
+        pendingRequests.delete(id);
+        if (error) pending.reject(new Error(error));
+        else pending.resolve(result);
+      }
+    };
+    wasmWorker.onerror = (ev) => {
+      clearTimeout(workerTimeout);
+      console.warn('[Engine] Worker error:', ev, '- trying direct WASM');
+      wasmWorker = null;
+      for (const [, p] of pendingRequests) p.reject(new Error('Worker error'));
+      pendingRequests.clear();
+      initWasmDirect();
+    };
+  } catch (e) {
+    console.warn('[Engine] Worker creation failed:', e, '- trying direct WASM');
+    initWasmDirect();
+  }
+}
+
+async function initWasmDirect(): Promise<void> {
+  if (wasmMode === 'direct' || wasmMode === 'worker') return;
+  try {
+    const wasm = await import('../wasm/engine/klikschaak_engine.js');
+    await wasm.default();
+    wasmEvalDirect = wasm.wasm_eval;
+    wasmMovesDirect = wasm.wasm_get_moves;
+    wasmMode = 'direct';
+    console.log('[Engine] WASM direct (main thread) ready');
+  } catch (e) {
+    console.error('[Engine] WASM direct load failed:', e);
+    wasmMode = 'failed';
+  }
+}
+
+// Start loading immediately
+initWasmWorker();
+
+function wasmRequest(type: string, fen: string, depth?: number): Promise<any> {
+  // Worker mode: send message
+  if (wasmMode === 'worker' && wasmWorker) {
+    return new Promise((resolve, reject) => {
+      const id = nextRequestId++;
+      pendingRequests.set(id, { resolve, reject });
+      wasmWorker!.postMessage({ id, type, fen, depth });
+      setTimeout(() => {
+        if (pendingRequests.has(id)) {
+          pendingRequests.delete(id);
+          reject(new Error('WASM timeout'));
+        }
+      }, 60000);
+    });
+  }
+
+  // Direct mode: call on main thread
+  if (wasmMode === 'direct') {
+    return new Promise((resolve, reject) => {
+      try {
+        // Use setTimeout(0) to not block the current call stack
+        setTimeout(() => {
+          try {
+            let resultStr: string;
+            if (type === 'eval') {
+              resultStr = wasmEvalDirect!(fen, depth ?? 4);
+            } else if (type === 'moves') {
+              resultStr = wasmMovesDirect!(fen);
+            } else {
+              reject(new Error(`Unknown type: ${type}`));
+              return;
+            }
+            resolve(JSON.parse(resultStr));
+          } catch (e) {
+            reject(e);
+          }
+        }, 0);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
+  return Promise.reject(new Error('WASM not available'));
+}
+
+function isWasmAvailable(): boolean {
+  return wasmMode === 'worker' || wasmMode === 'direct';
+}
+
+/**
+ * Wait for WASM to be ready (up to timeoutMs).
+ */
+export function waitForWasm(timeoutMs: number = 8000): Promise<boolean> {
+  if (isWasmAvailable()) return Promise.resolve(true);
+  if (wasmMode === 'failed') return Promise.resolve(false);
+
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const check = () => {
+      if (isWasmAvailable()) { resolve(true); return; }
+      if (wasmMode === 'failed' || Date.now() - start > timeoutMs) { resolve(false); return; }
+      setTimeout(check, 100);
+    };
+    check();
+  });
+}
 
 export interface MoveInfo {
   uci: string;
@@ -223,9 +374,31 @@ export function countAllWebappMoves(): { count: number; moves: MoveInfo[] } {
 }
 
 /**
- * Fetch legal moves from the Python engine API.
+ * Fetch legal moves from the engine (WASM first, HTTP fallback).
  */
 export async function fetchEngineMoves(fen: string): Promise<{ count: number; moves: MoveInfo[]; error: string | null }> {
+  // Wait for WASM if it's still loading
+  if (!isWasmAvailable() && wasmMode === 'loading') {
+    await waitForWasm(3000);
+  }
+  // Try WASM first
+  if (isWasmAvailable()) {
+    try {
+      const data = await wasmRequest('moves', fen);
+      if (data.error) {
+        return { count: 0, moves: [], error: data.error };
+      }
+      return {
+        count: data.count,
+        moves: data.moves.map((m: { uci: string; type: string }) => ({ uci: m.uci, type: m.type })),
+        error: null,
+      };
+    } catch {
+      // Fall through to HTTP
+    }
+  }
+
+  // HTTP fallback
   try {
     const response = await fetch(`${ENGINE_URL}/moves`, {
       method: 'POST',
@@ -254,9 +427,11 @@ export async function fetchEngineMoves(fen: string): Promise<{ count: number; mo
 }
 
 /**
- * Check if the engine is online.
+ * Check if the engine is available (WASM or HTTP).
  */
 export async function checkEngineHealth(): Promise<boolean> {
+  if (isWasmAvailable()) return true;
+
   try {
     const response = await fetch(`${ENGINE_URL}/health`, {
       signal: AbortSignal.timeout(2000),
@@ -281,9 +456,39 @@ export interface EvalResult {
 }
 
 /**
- * Fetch position evaluation from the Python engine API.
+ * Fetch position evaluation from the engine (WASM first, HTTP fallback).
  */
 export async function fetchEngineEval(fen: string, depth: number = 4): Promise<EvalResult> {
+  const emptyResult: EvalResult = { score: 0, scoreType: 'cp', bestMove: null, pv: [], depth: 0, nodes: 0, nps: 0, time_ms: 0, error: null };
+
+  // Wait for WASM if it's still loading
+  if (!isWasmAvailable() && wasmMode === 'loading') {
+    await waitForWasm(3000);
+  }
+  // Try WASM first
+  if (isWasmAvailable()) {
+    try {
+      const data = await wasmRequest('eval', fen, depth);
+      if (data.error) {
+        return { ...emptyResult, error: data.error };
+      }
+      return {
+        score: data.score,
+        scoreType: data.scoreType,
+        bestMove: data.bestMove,
+        pv: data.pv,
+        depth: data.depth,
+        nodes: data.nodes,
+        nps: data.nps,
+        time_ms: data.time_ms,
+        error: null,
+      };
+    } catch {
+      // Fall through to HTTP
+    }
+  }
+
+  // HTTP fallback
   try {
     const response = await fetch(`${ENGINE_URL}/eval`, {
       method: 'POST',
@@ -294,7 +499,7 @@ export async function fetchEngineEval(fen: string, depth: number = 4): Promise<E
 
     const data = await response.json();
     if (data.error) {
-      return { score: 0, scoreType: 'cp', bestMove: null, pv: [], depth: 0, nodes: 0, nps: 0, time_ms: 0, error: data.error };
+      return { ...emptyResult, error: data.error };
     }
 
     return {
@@ -311,9 +516,9 @@ export async function fetchEngineEval(fen: string, depth: number = 4): Promise<E
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed') || msg.includes('timeout') || msg.includes('abort')) {
-      return { score: 0, scoreType: 'cp', bestMove: null, pv: [], depth: 0, nodes: 0, nps: 0, time_ms: 0, error: 'Engine offline' };
+      return { ...emptyResult, error: 'Engine offline' };
     }
-    return { score: 0, scoreType: 'cp', bestMove: null, pv: [], depth: 0, nodes: 0, nps: 0, time_ms: 0, error: msg };
+    return { ...emptyResult, error: msg };
   }
 }
 

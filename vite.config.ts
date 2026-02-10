@@ -4,6 +4,7 @@ import { resolve } from 'path';
 export default defineConfig({
   root: '.',
   base: './',
+  assetsInclude: ['**/*.wasm'],
   build: {
     outDir: 'dist',
     emptyOutDir: true,
@@ -14,5 +15,8 @@ export default defineConfig({
   server: {
     port: 3000,
     open: '/index.dev.html',
+  },
+  worker: {
+    format: 'es',
   },
 });

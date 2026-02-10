@@ -1,0 +1,15 @@
+{
+  "name": "klikschaak-engine",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "klikschaak_engine_bg.wasm",
+    "klikschaak_engine.js",
+    "klikschaak_engine.d.ts"
+  ],
+  "main": "klikschaak_engine.js",
+  "types": "klikschaak_engine.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

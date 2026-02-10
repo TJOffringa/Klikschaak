@@ -24,8 +24,8 @@ import { openAnalysisFromGame, showAnalysisUI } from './analysisUI.js';
 import { tryExecutePremove } from '../game/actions.js';
 import { clearPremove } from '../multiplayer/premove.js';
 import * as state from '../game/state.js';
-import { startEngineGame, stopEngineGame, isEngineGame, isEngineThinking, getEngineColor } from '../game/engineGame.js';
-import { checkEngineHealth } from '../analysis/engineCompare.js';
+import { startEngineGame, stopEngineGame, isEngineGame, isEngineThinking, getEngineColor, resignEngineGame, offerDrawToEngine } from '../game/engineGame.js';
+import { checkEngineHealth, waitForWasm } from '../analysis/engineCompare.js';
 
 let lobbyContainer: HTMLElement | null = null;
 let gameCodeDisplay: HTMLElement | null = null;
@@ -161,16 +161,22 @@ function renderLobby(): void {
   // Engine play button
   document.getElementById('enginePlayBtn')?.addEventListener('click', handleStartEngineGame);
 
-  // Check engine health
-  checkEngineHealth().then(online => {
-    const statusEl = document.getElementById('engineStatus');
-    if (statusEl) {
+  // Check engine health (wait for WASM to load first)
+  const statusEl = document.getElementById('engineStatus');
+  if (statusEl) {
+    statusEl.textContent = 'Loading engine...';
+    statusEl.className = 'engine-status';
+  }
+  waitForWasm(10000).then(async (wasmOk) => {
+    const online = wasmOk || await checkEngineHealth();
+    const el = document.getElementById('engineStatus');
+    if (el) {
       if (online) {
-        statusEl.textContent = 'Engine online';
-        statusEl.className = 'engine-status online';
+        el.textContent = wasmOk ? 'Engine ready (WASM)' : 'Engine online';
+        el.className = 'engine-status online';
       } else {
-        statusEl.textContent = 'Engine offline';
-        statusEl.className = 'engine-status offline';
+        el.textContent = 'Engine offline';
+        el.className = 'engine-status offline';
       }
     }
   });
@@ -224,12 +230,35 @@ function renderEngineGamePanel(): void {
           <span>Engine thinking...</span>
         </div>
         <div class="engine-game-actions">
+          <button id="engineResignBtn" class="lobby-btn danger" title="Resign">&#9873; Resign</button>
+          <button id="engineDrawBtn" class="lobby-btn" title="Offer Draw">&frac12; Draw</button>
           <button id="engineNewGameBtn" class="lobby-btn engine">New Game</button>
           <button id="engineStopBtn" class="lobby-btn">Back to Lobby</button>
         </div>
       </div>
     </div>
   `;
+
+  document.getElementById('engineResignBtn')?.addEventListener('click', () => {
+    resignEngineGame();
+    renderEngineGamePanel();
+  });
+
+  document.getElementById('engineDrawBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('engineDrawBtn') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = '...';
+    const accepted = await offerDrawToEngine();
+    if (!accepted) {
+      btn.textContent = 'Declined!';
+      setTimeout(() => {
+        btn.textContent = '\u00BD Draw';
+        btn.disabled = false;
+      }, 2000);
+    } else {
+      renderEngineGamePanel();
+    }
+  });
 
   document.getElementById('engineNewGameBtn')?.addEventListener('click', () => {
     stopEngineGame();

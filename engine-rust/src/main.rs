@@ -1,14 +1,10 @@
-mod types;
-mod board;
-mod movegen;
-mod evaluate;
-mod search;
-mod api;
-mod bench;
-
-use board::Board;
-use movegen::generate_moves;
-use search::compute_zobrist;
+use klikschaak_engine::board::Board;
+use klikschaak_engine::movegen::{self, generate_moves};
+use klikschaak_engine::search::{self, compute_zobrist};
+use klikschaak_engine::evaluate;
+use klikschaak_engine::types;
+use klikschaak_engine::api;
+use klikschaak_engine::bench;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

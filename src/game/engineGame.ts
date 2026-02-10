@@ -6,7 +6,7 @@ import type { Piece, MoveType, ValidMove } from './types.js';
 import { getCombinedMoves, getPieceMoves } from './moves.js';
 import * as state from './state.js';
 import { buildFullFEN, fetchEngineEval } from '../analysis/engineCompare.js';
-import { renderBoard, updateUI } from '../ui/render.js';
+import { renderBoard, updateUI, showGameOver } from '../ui/render.js';
 
 const ENGINE_DEPTH = 8;
 
@@ -62,6 +62,37 @@ export function getEngineColor(): 'white' | 'black' {
 export function stopEngineGame(): void {
   engineState.active = false;
   engineState.thinking = false;
+}
+
+export function resignEngineGame(): void {
+  if (!engineState.active || state.isGameOver()) return;
+  engineState.thinking = false;
+  state.setGameOver(true);
+  showGameOver('checkmate', engineState.engineColor);
+}
+
+/**
+ * Offer a draw to the engine.
+ * The engine accepts if its eval is 0 or worse (from its perspective).
+ */
+export async function offerDrawToEngine(): Promise<boolean> {
+  if (!engineState.active || state.isGameOver()) return false;
+
+  const fen = buildFullFEN();
+  const result = await fetchEngineEval(fen, 6);
+
+  if (result.error) return false;
+
+  // Engine accepts if score is 0 or worse from its perspective
+  // result.score is from white's perspective
+  const engineScore = engineState.engineColor === 'white' ? result.score : -result.score;
+  if (engineScore <= 0) {
+    engineState.thinking = false;
+    state.setGameOver(true);
+    showGameOver('stalemate', null); // stalemate type shows "draw"
+    return true;
+  }
+  return false;
 }
 
 /**

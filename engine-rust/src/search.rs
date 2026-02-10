@@ -1,5 +1,6 @@
 /// Klikschaak Engine - Alpha-Beta Search
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 use crate::types::*;
 use crate::board::Board;
@@ -121,6 +122,7 @@ pub fn compute_zobrist(board: &mut Board) {
 
 pub struct SearchEngine {
     nodes: u64,
+    #[cfg(not(target_arch = "wasm32"))]
     start_time: Instant,
     max_time_ms: u64,
     stop_search: bool,
@@ -148,6 +150,7 @@ impl SearchEngine {
         let tt_size = 1 << 20; // ~1M entries
         SearchEngine {
             nodes: 0,
+            #[cfg(not(target_arch = "wasm32"))]
             start_time: Instant::now(),
             max_time_ms: u64::MAX,
             stop_search: false,
@@ -176,7 +179,8 @@ impl SearchEngine {
 
     pub fn search(&mut self, board: &mut Board, depth: u32, time_limit_ms: Option<u64>) -> (Option<Move>, SearchInfo) {
         self.nodes = 0;
-        self.start_time = Instant::now();
+        #[cfg(not(target_arch = "wasm32"))]
+        { self.start_time = Instant::now(); }
         self.max_time_ms = time_limit_ms.unwrap_or(u64::MAX);
         self.stop_search = false;
 
@@ -217,7 +221,10 @@ impl SearchEngine {
                     best_move = Some(*mv);
                 }
 
+                #[cfg(not(target_arch = "wasm32"))]
                 let elapsed = self.start_time.elapsed().as_millis() as u64;
+                #[cfg(target_arch = "wasm32")]
+                let elapsed = 0u64;
                 info.time_ms = elapsed;
                 info.nps = if elapsed > 0 { self.nodes * 1000 / elapsed } else { 0 };
 
@@ -241,7 +248,8 @@ impl SearchEngine {
                   prev_move: Option<Move>) -> (i32, Vec<Move>) {
         self.nodes += 1;
 
-        // Time check
+        // Time check (disabled on WASM — depth-limited only)
+        #[cfg(not(target_arch = "wasm32"))]
         if self.nodes % 4096 == 0 {
             let elapsed = self.start_time.elapsed().as_millis() as u64;
             if elapsed >= self.max_time_ms {

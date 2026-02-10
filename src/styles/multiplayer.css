@@ -869,6 +869,14 @@
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
 }
 
+.lobby-btn.danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.lobby-btn.danger:hover {
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
 .engine-status {
   font-size: 11px;
   margin-top: 6px;
@@ -926,6 +934,7 @@
 .engine-game-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .engine-game-actions .lobby-btn {

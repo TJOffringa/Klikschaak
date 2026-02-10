@@ -139,8 +139,10 @@ class Move:
 
         if self.move_type == MoveType.KLIK:
             s += "k"
-        elif self.move_type in (MoveType.UNKLIK, MoveType.UNKLIK_KLIK):
+        elif self.move_type == MoveType.UNKLIK:
             s += f"u{self.unklik_index}"
+        elif self.move_type == MoveType.UNKLIK_KLIK:
+            s += f"U{self.unklik_index}"
 
         return s
 

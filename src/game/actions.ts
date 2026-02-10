@@ -371,13 +371,15 @@ export function movePiece(fromRow: number, fromCol: number, toRow: number, toCol
         state.setBoardSquare(toRow, toCol, [movingPiece]);
       }
 
-      if (state.isAutoPromoteEnabled()) {
-        const promoteTo = isWhitePiece(movingPiece) ? 'Q' : 'q';
+      const resolvedPromo = promoteTo || (state.isAutoPromoteEnabled()
+        ? (isWhitePiece(movingPiece) ? 'Q' : 'q') as Piece
+        : null);
+      if (resolvedPromo) {
         const currentPieces = state.getBoardSquare(toRow, toCol);
         const newPieces = currentPieces.filter(p => !isPawn(p));
-        newPieces.unshift(promoteTo as Piece);
+        newPieces.unshift(resolvedPromo);
         state.setBoardSquare(toRow, toCol, newPieces);
-        moveNotation += '=' + PIECE_SYMBOLS[promoteTo];
+        moveNotation += '=' + PIECE_SYMBOLS[resolvedPromo];
 
         state.updateCastlingRights(fromRow, fromCol, toRow, toCol, newPieces);
         finishMove(moveNotation);
@@ -433,13 +435,15 @@ export function movePiece(fromRow: number, fromCol: number, toRow: number, toCol
         state.setBoardSquare(toRow, toCol, piecesToMove);
       }
 
-      if (state.isAutoPromoteEnabled()) {
-        const promoteTo = isWhitePiece(piecesToMove[0]) ? 'Q' : 'q';
+      const resolvedPromo2 = promoteTo || (state.isAutoPromoteEnabled()
+        ? (isWhitePiece(piecesToMove[0]) ? 'Q' : 'q') as Piece
+        : null);
+      if (resolvedPromo2) {
         const currentPieces = state.getBoardSquare(toRow, toCol);
         const newPieces = currentPieces.filter(p => !isPawn(p));
-        newPieces.unshift(promoteTo as Piece);
+        newPieces.unshift(resolvedPromo2);
         state.setBoardSquare(toRow, toCol, newPieces);
-        moveNotation += '=' + PIECE_SYMBOLS[promoteTo];
+        moveNotation += '=' + PIECE_SYMBOLS[resolvedPromo2];
 
         state.updateCastlingRights(fromRow, fromCol, toRow, toCol, newPieces);
         finishMove(moveNotation);

@@ -195,8 +195,11 @@ impl Move {
 
         match self.move_type {
             MT_KLIK => s.push('k'),
-            MT_UNKLIK | MT_UNKLIK_KLIK => {
+            MT_UNKLIK => {
                 s.push_str(&format!("u{}", self.unklik_index));
+            }
+            MT_UNKLIK_KLIK => {
+                s.push_str(&format!("U{}", self.unklik_index));
             }
             _ => {}
         }
