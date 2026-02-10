@@ -217,7 +217,7 @@ function renderEngineGamePanel(): void {
       </div>
       <div class="engine-game-body">
         <div class="engine-game-info">
-          <span>You play ${playerColor} (depth 10)</span>
+          <span>You play ${playerColor} (depth 8)</span>
         </div>
         <div id="engineThinking" class="engine-thinking" style="display: ${isEngineThinking() ? 'flex' : 'none'}">
           <span class="thinking-dots"></span>

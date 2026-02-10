@@ -289,7 +289,7 @@ export async function fetchEngineEval(fen: string, depth: number = 4): Promise<E
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fen, depth }),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(30000),
     });
 
     const data = await response.json();

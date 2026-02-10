@@ -8,7 +8,7 @@ import * as state from './state.js';
 import { buildFullFEN, fetchEngineEval } from '../analysis/engineCompare.js';
 import { renderBoard, updateUI } from '../ui/render.js';
 
-const ENGINE_DEPTH = 10;
+const ENGINE_DEPTH = 8;
 
 interface EngineGameState {
   active: boolean;
@@ -131,24 +131,26 @@ export async function requestEngineMove(): Promise<void> {
 
   try {
     const fen = buildFullFEN();
+    console.log('[Engine] Requesting move for FEN:', fen);
     const result = await fetchEngineEval(fen, ENGINE_DEPTH);
 
     if (!engineState.active || state.isGameOver()) return;
 
     if (result.error || !result.bestMove) {
-      console.error('Engine error:', result.error);
+      console.error('[Engine] Error:', result.error);
       engineState.thinking = false;
       updateEnginePanel();
       return;
     }
 
+    console.log('[Engine] Best move:', result.bestMove, 'depth:', result.depth, 'score:', result.score);
     const parsed = parseUCIMove(result.bestMove);
 
     // Use dynamic import to avoid circular dependency with actions.ts
     const actions = await import('./actions.js');
     executeEngineMove(parsed, actions);
   } catch (e) {
-    console.error('Engine request failed:', e);
+    console.error('[Engine] Request failed:', e);
   }
 
   engineState.thinking = false;
