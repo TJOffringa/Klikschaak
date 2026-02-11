@@ -26,7 +26,7 @@ import { clearPremove } from '../multiplayer/premove.js';
 import * as state from '../game/state.js';
 import { startEngineGame, stopEngineGame, isEngineGame, isEngineThinking, getEngineColor, resignEngineGame, offerDrawToEngine } from '../game/engineGame.js';
 import { checkEngineHealth, waitForWasm } from '../analysis/engineCompare.js';
-import { saveGame, type SavedGame } from '../game/gameStorage.js';
+import { saveGame } from '../game/gameStorage.js';
 
 let lobbyContainer: HTMLElement | null = null;
 let gameCodeDisplay: HTMLElement | null = null;

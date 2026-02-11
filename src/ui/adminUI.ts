@@ -1,5 +1,5 @@
 import { getAuthToken } from '../multiplayer/auth.js';
-import { getGames, deleteGame as deleteGameFromDB, type SavedGame } from '../game/gameStorage.js';
+import { getGames, deleteGame as deleteGameFromDB } from '../game/gameStorage.js';
 import { openAnalysisFromGame } from './analysisUI.js';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
@@ -16,7 +16,6 @@ interface AdminUser {
 
 let adminPanel: HTMLElement | null = null;
 let isAdminPanelOpen = false;
-let activeTab: 'users' | 'games' = 'users';
 
 export async function checkIsAdmin(): Promise<boolean> {
   const token = getAuthToken();
@@ -64,7 +63,6 @@ function toggleAdminPanel(): void {
 
 async function openAdminPanel(): Promise<void> {
   isAdminPanelOpen = true;
-  activeTab = 'users';
 
   adminPanel = document.createElement('div');
   adminPanel.id = 'adminPanel';
@@ -98,7 +96,6 @@ async function openAdminPanel(): Promise<void> {
 }
 
 function switchTab(tab: 'users' | 'games'): void {
-  activeTab = tab;
   adminPanel?.querySelectorAll('.admin-tab').forEach(t => {
     t.classList.toggle('active', t.getAttribute('data-tab') === tab);
   });
