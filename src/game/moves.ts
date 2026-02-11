@@ -503,6 +503,32 @@ export function hasLegalMoves(
           const piece = pieces[i];
           const singleMoves = getPieceMoves(board, r, c, piece, castlingRights, enPassantTarget, movedPawns);
 
+          // Pawn klik targets: forward onto friendly non-king piece (getPieceMoves only returns empty/enemy)
+          if (isPawn(piece)) {
+            const dir = isWhite ? -1 : 1;
+            const startRow = isWhite ? 6 : 1;
+            const promoRank = isWhite ? 0 : 7;
+            const fwdRow = r + dir;
+            if (fwdRow >= 0 && fwdRow < 8 && fwdRow !== promoRank) {
+              const fwdSq = board[fwdRow][c];
+              if (fwdSq.pieces.length === 1 && isWhitePiece(fwdSq.pieces[0]) === isWhite &&
+                  getPieceType(fwdSq.pieces[0]) !== 'k') {
+                singleMoves.push([fwdRow, c]);
+              }
+            }
+            if (r === startRow && !movedPawns.has(piece)) {
+              const midRow = r + dir;
+              const dblRow = r + 2 * dir;
+              if (board[midRow][c].pieces.length === 0 && dblRow !== promoRank) {
+                const dblSq = board[dblRow][c];
+                if (dblSq.pieces.length === 1 && isWhitePiece(dblSq.pieces[0]) === isWhite &&
+                    getPieceType(dblSq.pieces[0]) !== 'k') {
+                  singleMoves.push([dblRow, c]);
+                }
+              }
+            }
+          }
+
           for (const move of singleMoves) {
             const [mr, mc] = move;
             const targetSq = board[mr][mc];

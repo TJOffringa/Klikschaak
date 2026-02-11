@@ -167,6 +167,33 @@ export function handleUnklikSelect(row: number, col: number, pieceIndex: number,
   const movesKlik: ValidMove[] = [];
   const isPawnPiece = isPawn(selectedPiece);
 
+  // Pawn klik targets: forward onto friendly non-king piece (getPieceMoves only returns empty/enemy)
+  if (isPawnPiece) {
+    const dir = isWhite ? -1 : 1;
+    const startRow = isWhite ? 6 : 1;
+    const promoRank = isWhite ? 0 : 7;
+    const fwdRow = row + dir;
+    if (fwdRow >= 0 && fwdRow < 8 && fwdRow !== promoRank) {
+      const fwdSq = board[fwdRow][col];
+      if (fwdSq.pieces.length === 1 && isWhitePiece(fwdSq.pieces[0]) === isWhite &&
+          getPieceType(fwdSq.pieces[0]) !== 'k') {
+        singleMoves.push([fwdRow, col]);
+      }
+    }
+    // Double-move klik from start row
+    if (row === startRow && !state.getMovedPawns().has(selectedPiece)) {
+      const midRow = row + dir;
+      const dblRow = row + 2 * dir;
+      if (board[midRow][col].pieces.length === 0 && dblRow !== promoRank) {
+        const dblSq = board[dblRow][col];
+        if (dblSq.pieces.length === 1 && isWhitePiece(dblSq.pieces[0]) === isWhite &&
+            getPieceType(dblSq.pieces[0]) !== 'k') {
+          singleMoves.push([dblRow, col]);
+        }
+      }
+    }
+  }
+
   for (const move of singleMoves) {
     const [r, c, moveType] = move;
     const targetSq = board[r][c];
