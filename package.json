@@ -11,7 +11,9 @@
     "build": "tsc && vite build && node -e \"require('fs').copyFileSync('dist/index.dev.html','dist/index.html')\"",
     "build:server": "cd server && npm run build",
     "preview": "vite preview",
-    "deploy": "npm run build && gh-pages -d dist"
+    "deploy": "npm run build && gh-pages -d dist",
+    "cap:sync": "npm run build && npx cap sync android",
+    "cap:open": "npx cap open android"
   },
   "repository": {
     "type": "git",
@@ -31,6 +33,11 @@
   },
   "homepage": "https://github.com/tjoffringa/klikschaak#readme",
   "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/splash-screen": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0",
     "socket.io-client": "^4.7.2"
   },
   "devDependencies": {
