@@ -14,7 +14,8 @@ import { isOnline, isMyTurn, sendMove, getMyColor } from '../multiplayer/onlineG
 import { isAnalysisMode, addAnalysisMove } from '../analysis/analysisMode.js';
 import { updateAnalysisUI } from '../ui/analysisUI.js';
 import { hasPremove, setPremove, clearPremove, getPremove } from '../multiplayer/premove.js';
-import { isEngineGame, isEngineTurn, requestEngineMove } from './engineGame.js';
+import { isEngineGame, isEngineTurn, requestEngineMove, getEngineColor } from './engineGame.js';
+import { saveGame } from './gameStorage.js';
 
 export function handleSquareClick(row: number, col: number): void {
   if (state.isGameOver() && !isAnalysisMode()) return;
@@ -595,8 +596,29 @@ function checkForCheckmate(): void {
 
   if (!hasLegal) {
     state.setGameOver(true);
+    const winner = inCheck ? (currentTurn === 'white' ? 'black' : 'white') : null;
+    const result = inCheck ? `checkmate:${winner}` : 'stalemate:draw';
+
+    // Save game (engine or local)
+    if (!isOnline()) {
+      const gameType = isEngineGame() ? 'engine' : 'local';
+      const engineColor = isEngineGame() ? getEngineColor() : null;
+      const whiteName = gameType === 'engine' ? (engineColor === 'white' ? 'Engine' : 'You') : 'White';
+      const blackName = gameType === 'engine' ? (engineColor === 'black' ? 'Engine' : 'You') : 'Black';
+      saveGame({
+        id: crypto.randomUUID(),
+        date: new Date().toISOString(),
+        type: gameType,
+        white: whiteName,
+        black: blackName,
+        result,
+        moves: state.getMoveHistory(),
+        moveCount: Math.ceil(state.getMoveHistory().length / 2),
+      }).catch(e => console.error('[GameStorage] Failed to save game:', e));
+    }
+
     if (inCheck) {
-      showGameOver('checkmate', currentTurn === 'white' ? 'black' : 'white');
+      showGameOver('checkmate', winner);
     } else {
       showGameOver('stalemate', null);
     }

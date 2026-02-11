@@ -1,4 +1,6 @@
 import { getAuthToken } from '../multiplayer/auth.js';
+import { getGames, deleteGame as deleteGameFromDB, type SavedGame } from '../game/gameStorage.js';
+import { openAnalysisFromGame } from './analysisUI.js';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 
@@ -14,6 +16,7 @@ interface AdminUser {
 
 let adminPanel: HTMLElement | null = null;
 let isAdminPanelOpen = false;
+let activeTab: 'users' | 'games' = 'users';
 
 export async function checkIsAdmin(): Promise<boolean> {
   const token = getAuthToken();
@@ -61,6 +64,7 @@ function toggleAdminPanel(): void {
 
 async function openAdminPanel(): Promise<void> {
   isAdminPanelOpen = true;
+  activeTab = 'users';
 
   adminPanel = document.createElement('div');
   adminPanel.id = 'adminPanel';
@@ -68,17 +72,41 @@ async function openAdminPanel(): Promise<void> {
   adminPanel.innerHTML = `
     <div class="admin-panel-header">
       <h2>Admin Dashboard</h2>
+      <div class="admin-tabs">
+        <button class="admin-tab active" data-tab="users">Users</button>
+        <button class="admin-tab" data-tab="games">Games</button>
+      </div>
       <button id="closeAdminBtn" class="admin-close-btn">&times;</button>
     </div>
     <div class="admin-panel-content">
-      <div id="adminUserList">Loading...</div>
+      <div id="adminTabContent">Loading...</div>
     </div>
   `;
 
   document.body.appendChild(adminPanel);
   document.getElementById('closeAdminBtn')?.addEventListener('click', closeAdminPanel);
 
+  // Tab switching
+  adminPanel.querySelectorAll('.admin-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabName = tab.getAttribute('data-tab') as 'users' | 'games';
+      switchTab(tabName);
+    });
+  });
+
   await loadUsers();
+}
+
+function switchTab(tab: 'users' | 'games'): void {
+  activeTab = tab;
+  adminPanel?.querySelectorAll('.admin-tab').forEach(t => {
+    t.classList.toggle('active', t.getAttribute('data-tab') === tab);
+  });
+  if (tab === 'users') {
+    loadUsers();
+  } else {
+    loadGames();
+  }
 }
 
 function closeAdminPanel(): void {
@@ -91,8 +119,8 @@ async function loadUsers(): Promise<void> {
   const token = getAuthToken();
   if (!token) return;
 
-  const userList = document.getElementById('adminUserList');
-  if (!userList) return;
+  const content = document.getElementById('adminTabContent');
+  if (!content) return;
 
   try {
     const response = await fetch(`${SERVER_URL}/api/admin/users`, {
@@ -100,18 +128,18 @@ async function loadUsers(): Promise<void> {
     });
 
     if (!response.ok) {
-      userList.innerHTML = '<p class="error">Failed to load users</p>';
+      content.innerHTML = '<p class="error">Failed to load users</p>';
       return;
     }
 
     const { users } = await response.json() as { users: AdminUser[] };
 
     if (users.length === 0) {
-      userList.innerHTML = '<p>No users found</p>';
+      content.innerHTML = '<p>No users found</p>';
       return;
     }
 
-    userList.innerHTML = `
+    content.innerHTML = `
       <table class="admin-table">
         <thead>
           <tr>
@@ -146,17 +174,102 @@ async function loadUsers(): Promise<void> {
     `;
 
     // Add event listeners
-    userList.querySelectorAll('.toggle-admin').forEach(btn => {
+    content.querySelectorAll('.toggle-admin').forEach(btn => {
       btn.addEventListener('click', () => toggleAdmin(btn.getAttribute('data-id')!));
     });
 
-    userList.querySelectorAll('.delete-user').forEach(btn => {
+    content.querySelectorAll('.delete-user').forEach(btn => {
       btn.addEventListener('click', () => deleteUser(btn.getAttribute('data-id')!));
     });
 
   } catch (error) {
-    userList.innerHTML = '<p class="error">Error loading users</p>';
+    content.innerHTML = '<p class="error">Error loading users</p>';
   }
+}
+
+async function loadGames(): Promise<void> {
+  const content = document.getElementById('adminTabContent');
+  if (!content) return;
+
+  content.innerHTML = 'Loading games...';
+
+  try {
+    const games = await getGames();
+
+    if (games.length === 0) {
+      content.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:20px;">No saved games yet.</p>';
+      return;
+    }
+
+    content.innerHTML = `
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th>White vs Black</th>
+            <th>Result</th>
+            <th>Moves</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${games.map(game => `
+            <tr data-game-id="${game.id}">
+              <td>${formatDate(game.date)}</td>
+              <td><span class="game-type-badge ${game.type}">${game.type}</span></td>
+              <td>${escapeHtml(game.white)} vs ${escapeHtml(game.black)}</td>
+              <td>${escapeHtml(game.result)}</td>
+              <td>${game.moveCount}</td>
+              <td>
+                <button class="admin-action-btn analyze-game" data-id="${game.id}" title="Analyze">
+                  &#128269;
+                </button>
+                <button class="admin-action-btn delete-game" data-id="${game.id}" title="Delete">
+                  🗑️
+                </button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+
+    // Store games for click handlers
+    content.querySelectorAll('.analyze-game').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const gameId = btn.getAttribute('data-id')!;
+        const game = games.find(g => g.id === gameId);
+        if (game) {
+          closeAdminPanel();
+          openAnalysisFromGame(game.moves, game.white, game.black);
+        }
+      });
+    });
+
+    content.querySelectorAll('.delete-game').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const gameId = btn.getAttribute('data-id')!;
+        if (confirm('Delete this game?')) {
+          await deleteGameFromDB(gameId);
+          await loadGames();
+        }
+      });
+    });
+
+  } catch (error) {
+    content.innerHTML = '<p class="error">Error loading games</p>';
+  }
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 async function toggleAdmin(userId: string): Promise<void> {

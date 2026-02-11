@@ -7,6 +7,7 @@ import { getCombinedMoves, getPieceMoves } from './moves.js';
 import * as state from './state.js';
 import { buildFullFEN, fetchEngineEval } from '../analysis/engineCompare.js';
 import { renderBoard, updateUI, showGameOver } from '../ui/render.js';
+import { saveGame } from './gameStorage.js';
 
 const ENGINE_DEPTH = 8;
 
@@ -64,11 +65,27 @@ export function stopEngineGame(): void {
   engineState.thinking = false;
 }
 
+function saveEngineGameResult(result: string): void {
+  const whiteName = engineState.engineColor === 'white' ? 'Engine' : 'You';
+  const blackName = engineState.engineColor === 'black' ? 'Engine' : 'You';
+  saveGame({
+    id: crypto.randomUUID(),
+    date: new Date().toISOString(),
+    type: 'engine',
+    white: whiteName,
+    black: blackName,
+    result,
+    moves: state.getMoveHistory(),
+    moveCount: Math.ceil(state.getMoveHistory().length / 2),
+  }).catch(e => console.error('[GameStorage] Failed to save engine game:', e));
+}
+
 export function resignEngineGame(): void {
   if (!engineState.active || state.isGameOver()) return;
   engineState.thinking = false;
   state.setGameOver(true);
-  showGameOver('checkmate', engineState.engineColor);
+  saveEngineGameResult(`resignation:${engineState.engineColor}`);
+  showGameOver('resignation', engineState.engineColor);
 }
 
 /**
@@ -89,6 +106,7 @@ export async function offerDrawToEngine(): Promise<boolean> {
   if (engineScore <= 0) {
     engineState.thinking = false;
     state.setGameOver(true);
+    saveEngineGameResult('draw:agreement');
     showGameOver('stalemate', null); // stalemate type shows "draw"
     return true;
   }

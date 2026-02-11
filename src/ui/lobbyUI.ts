@@ -26,6 +26,7 @@ import { clearPremove } from '../multiplayer/premove.js';
 import * as state from '../game/state.js';
 import { startEngineGame, stopEngineGame, isEngineGame, isEngineThinking, getEngineColor, resignEngineGame, offerDrawToEngine } from '../game/engineGame.js';
 import { checkEngineHealth, waitForWasm } from '../analysis/engineCompare.js';
+import { saveGame, type SavedGame } from '../game/gameStorage.js';
 
 let lobbyContainer: HTMLElement | null = null;
 let gameCodeDisplay: HTMLElement | null = null;
@@ -229,7 +230,9 @@ function renderEngineGamePanel(): void {
           <span>Engine thinking...</span>
         </div>
         <div class="engine-game-actions">
-          ${gameOver ? '' : `
+          ${gameOver ? `
+            <button id="engineAnalyzeBtn" class="lobby-btn analysis">Analyze</button>
+          ` : `
             <button id="engineResignBtn" class="lobby-btn danger" title="Resign">Resign</button>
             <button id="engineDrawBtn" class="lobby-btn draw" title="Offer Draw">&frac12; Draw</button>
           `}
@@ -239,6 +242,16 @@ function renderEngineGamePanel(): void {
       </div>
     </div>
   `;
+
+  document.getElementById('engineAnalyzeBtn')?.addEventListener('click', () => {
+    const moves = state.getMoveHistory();
+    const whiteName = engineColor === 'white' ? 'Engine' : 'You';
+    const blackName = engineColor === 'black' ? 'Engine' : 'You';
+    const overlay = document.getElementById('gameOverOverlay');
+    if (overlay) overlay.remove();
+    stopEngineGame();
+    openAnalysisFromGame(moves, whiteName, blackName);
+  });
 
   document.getElementById('engineResignBtn')?.addEventListener('click', () => {
     resignEngineGame();
@@ -582,6 +595,26 @@ function showGameOverModal(message: string): void {
   const lastGame = getLastGameInfo();
   const showRematch = lastGame !== null;
   const gameState = getOnlineGameState();
+
+  // Save online game to IndexedDB
+  if (gameState) {
+    const whiteName = gameState.myColor === 'white'
+      ? (getCurrentUser()?.username || 'You')
+      : (gameState.opponent?.username || 'Opponent');
+    const blackName = gameState.myColor === 'black'
+      ? (getCurrentUser()?.username || 'You')
+      : (gameState.opponent?.username || 'Opponent');
+    saveGame({
+      id: crypto.randomUUID(),
+      date: new Date().toISOString(),
+      type: 'online',
+      white: whiteName,
+      black: blackName,
+      result: message,
+      moves: gameState.moveHistory || state.getMoveHistory(),
+      moveCount: Math.ceil((gameState.moveHistory || state.getMoveHistory()).length / 2),
+    }).catch(e => console.error('[GameStorage] Failed to save online game:', e));
+  }
 
   modal.innerHTML = `
     <div class="modal-content">

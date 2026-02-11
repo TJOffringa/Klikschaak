@@ -305,7 +305,7 @@ export function showCheckIndicator(): void {
   }, 3000);
 }
 
-export function showGameOver(type: 'checkmate' | 'stalemate', winner: PieceColor | null): void {
+export function showGameOver(type: 'checkmate' | 'stalemate' | 'resignation', winner: PieceColor | null): void {
   const overlay = document.createElement('div');
   overlay.className = 'promotion-overlay';
   overlay.id = 'gameOverOverlay';
@@ -321,7 +321,13 @@ export function showGameOver(type: 'checkmate' | 'stalemate', winner: PieceColor
 
   const titleDiv = document.createElement('div');
   titleDiv.className = 'game-over-title';
-  titleDiv.textContent = type === 'checkmate' ? t('checkmate') : t('stalemate');
+  if (type === 'checkmate') {
+    titleDiv.textContent = t('checkmate');
+  } else if (type === 'stalemate') {
+    titleDiv.textContent = t('stalemate');
+  } else {
+    titleDiv.textContent = getLanguage() === 'nl' ? 'Opgegeven' : 'Resigned';
+  }
   box.appendChild(titleDiv);
 
   const message = document.createElement('div');
