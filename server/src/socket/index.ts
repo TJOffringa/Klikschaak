@@ -6,9 +6,21 @@ import { setupGameHandlers } from './handlers/game.js';
 import type { Player } from '../game/types.js';
 
 export function setupSocketIO(httpServer: HttpServer, clientUrl: string): Server {
+  const allowedOrigins = [
+    clientUrl,
+    'https://localhost',
+    'capacitor://localhost',
+    'http://localhost',
+  ];
   const io = new Server(httpServer, {
     cors: {
-      origin: clientUrl,
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(null, false);
+        }
+      },
       methods: ['GET', 'POST'],
       credentials: true,
     },

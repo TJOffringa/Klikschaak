@@ -17,8 +17,21 @@ const PORT = process.env.PORT || 3001;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 // Middleware
+const allowedOrigins = [
+  CLIENT_URL,
+  'https://localhost',           // Capacitor Android
+  'capacitor://localhost',       // Capacitor iOS
+  'http://localhost',            // Capacitor fallback
+];
 app.use(cors({
-  origin: CLIENT_URL,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
   credentials: true,
 }));
 app.use(express.json());
