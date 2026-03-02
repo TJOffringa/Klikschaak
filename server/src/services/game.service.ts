@@ -1,7 +1,7 @@
 import { GameSession } from '../game/GameSession.js';
 import { TimeControl, TimeControlSettings } from '../game/Timer.js';
 import type { Player, GameResult } from '../game/types.js';
-import { supabase } from '../config/database.js';
+import { pool, query } from '../config/database.js';
 import { updateUserStats } from './auth.service.js';
 
 class GameService {
@@ -65,7 +65,7 @@ class GameService {
     const whitePlayer = session.getPlayer('white');
     const blackPlayer = session.getPlayer('black');
 
-    if (whitePlayer && blackPlayer && supabase) {
+    if (whitePlayer && blackPlayer && pool) {
       try {
         // Determine results for each player
         let whiteResult: 'win' | 'loss' | 'draw';
@@ -88,15 +88,18 @@ class GameService {
         ]);
 
         // Save game to database
-        await supabase.from('games').insert({
-          id: session.id,
-          white_player: whitePlayer.id,
-          black_player: blackPlayer.id,
-          status: 'finished',
-          time_control: session.timeControl,
-          moves: session.getMoveHistory(),
-          result: `${result.type}:${result.winner || 'draw'}`,
-        });
+        await query(
+          `INSERT INTO games (id, white_player, black_player, status, time_control, moves, result)
+           VALUES ($1, $2, $3, 'finished', $4, $5, $6)`,
+          [
+            session.id,
+            whitePlayer.id,
+            blackPlayer.id,
+            session.timeControl,
+            JSON.stringify(session.getMoveHistory()),
+            `${result.type}:${result.winner || 'draw'}`,
+          ]
+        );
       } catch (error) {
         console.error('Error saving game result:', error);
       }

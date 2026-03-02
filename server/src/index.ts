@@ -19,6 +19,7 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 // Middleware
 const allowedOrigins = [
   CLIENT_URL,
+  'https://klikschaak.dedyn.io', // Self-hosted production
   'https://localhost',           // Capacitor Android
   'capacitor://localhost',       // Capacitor iOS
   'http://localhost',            // Capacitor fallback

@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { supabase, DbUser } from '../config/database.js';
+import { pool, query, DbUser } from '../config/database.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 const JWT_EXPIRES_IN = '7d';
@@ -37,7 +37,7 @@ export async function registerUser(
   email: string,
   password: string
 ): Promise<AuthResult> {
-  if (!supabase) {
+  if (!pool) {
     return { success: false, error: 'Database not configured' };
   }
 
@@ -54,13 +54,12 @@ export async function registerUser(
 
   try {
     // Check if username or email already exists
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('id')
-      .or(`username.eq.${username},email.eq.${email}`)
-      .single();
+    const { rows: existing } = await query(
+      'SELECT id FROM users WHERE username = $1 OR email = $2 LIMIT 1',
+      [username, email.toLowerCase()]
+    );
 
-    if (existingUser) {
+    if (existing.length > 0) {
       return { success: false, error: 'Username or email already exists' };
     }
 
@@ -71,31 +70,25 @@ export async function registerUser(
     let friendCode = generateFriendCode();
     let attempts = 0;
     while (attempts < 10) {
-      const { data: existing } = await supabase
-        .from('users')
-        .select('id')
-        .eq('friend_code', friendCode)
-        .single();
-
-      if (!existing) break;
+      const { rows } = await query(
+        'SELECT id FROM users WHERE friend_code = $1 LIMIT 1',
+        [friendCode]
+      );
+      if (rows.length === 0) break;
       friendCode = generateFriendCode();
       attempts++;
     }
 
     // Create user
-    const { data: newUser, error: createError } = await supabase
-      .from('users')
-      .insert({
-        username,
-        email: email.toLowerCase(),
-        password_hash: passwordHash,
-        friend_code: friendCode,
-      })
-      .select()
-      .single();
+    const { rows } = await query(
+      `INSERT INTO users (username, email, password_hash, friend_code)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [username, email.toLowerCase(), passwordHash, friendCode]
+    );
 
-    if (createError || !newUser) {
-      console.error('Error creating user:', createError);
+    const newUser = rows[0];
+    if (!newUser) {
       return { success: false, error: 'Failed to create account' };
     }
 
@@ -130,20 +123,22 @@ export async function loginUser(
   usernameOrEmail: string,
   password: string
 ): Promise<AuthResult> {
-  if (!supabase) {
+  if (!pool) {
     return { success: false, error: 'Database not configured' };
   }
 
   try {
     // Find user by username or email
     const isEmail = usernameOrEmail.includes('@');
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq(isEmail ? 'email' : 'username', isEmail ? usernameOrEmail.toLowerCase() : usernameOrEmail)
-      .single();
+    const { rows } = await query(
+      isEmail
+        ? 'SELECT * FROM users WHERE email = $1'
+        : 'SELECT * FROM users WHERE username = $1',
+      [isEmail ? usernameOrEmail.toLowerCase() : usernameOrEmail]
+    );
 
-    if (error || !user) {
+    const user = rows[0];
+    if (!user) {
       return { success: false, error: 'Invalid credentials' };
     }
 
@@ -190,17 +185,11 @@ export function verifyToken(token: string): JwtPayload | null {
 }
 
 export async function getUserById(userId: string): Promise<DbUser | null> {
-  if (!supabase) return null;
+  if (!pool) return null;
 
   try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (error || !data) return null;
-    return data as DbUser;
+    const { rows } = await query('SELECT * FROM users WHERE id = $1', [userId]);
+    return (rows[0] as DbUser) || null;
   } catch {
     return null;
   }
@@ -211,7 +200,7 @@ export async function updateUserStats(
   result: 'win' | 'loss' | 'draw',
   playedAs?: 'white' | 'black'
 ): Promise<void> {
-  if (!supabase) return;
+  if (!pool) return;
 
   try {
     const user = await getUserById(userId);
@@ -232,10 +221,7 @@ export async function updateUserStats(
     if (playedAs === 'white') stats.gamesAsWhite++;
     else if (playedAs === 'black') stats.gamesAsBlack++;
 
-    await supabase
-      .from('users')
-      .update({ stats })
-      .eq('id', userId);
+    await query('UPDATE users SET stats = $1 WHERE id = $2', [JSON.stringify(stats), userId]);
   } catch (error) {
     console.error('Error updating user stats:', error);
   }
@@ -255,19 +241,14 @@ export function determineColors(
   player1Stats: { white: number; black: number },
   player2Stats: { white: number; black: number }
 ): { player1Color: 'white' | 'black'; player2Color: 'white' | 'black' } {
-  // Calculate the "white deficit" for each player
-  // A positive deficit means they've played more black than white
   const player1Deficit = player1Stats.black - player1Stats.white;
   const player2Deficit = player2Stats.black - player2Stats.white;
 
-  // The player with the higher deficit (played more black) should get white
-  // If equal, randomize
   if (player1Deficit > player2Deficit) {
     return { player1Color: 'white', player2Color: 'black' };
   } else if (player2Deficit > player1Deficit) {
     return { player1Color: 'black', player2Color: 'white' };
   } else {
-    // Equal deficit - randomize
     const random = Math.random() < 0.5;
     return {
       player1Color: random ? 'white' : 'black',

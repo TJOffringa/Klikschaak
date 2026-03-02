@@ -1,5 +1,5 @@
--- Klikschaak Database Schema for Supabase
--- Run this in the Supabase SQL Editor
+-- Klikschaak Database Schema for PostgreSQL
+-- Run this on your PostgreSQL server: psql -U klikschaak -d klikschaak -f schema.sql
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   friend_code VARCHAR(8) UNIQUE NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  stats JSONB DEFAULT '{"wins":0,"losses":0,"draws":0}'
+  stats JSONB DEFAULT '{"wins":0,"losses":0,"draws":0}',
+  is_admin BOOLEAN DEFAULT false
 );
 
 -- Invite codes table
@@ -52,15 +53,3 @@ INSERT INTO invite_codes (code, max_uses, active) VALUES
   ('KLIKSCHAAK', 50, true),
   ('WELCOME', 25, true)
 ON CONFLICT (code) DO NOTHING;
-
--- Row Level Security (optional but recommended)
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE games ENABLE ROW LEVEL SECURITY;
-
--- Allow users to read their own data
-CREATE POLICY "Users can read own data" ON users
-  FOR SELECT USING (true);
-
--- Allow users to read games they're in
-CREATE POLICY "Users can read their games" ON games
-  FOR SELECT USING (true);
