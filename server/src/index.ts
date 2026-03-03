@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import { createServer } from 'http';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes.js';
 import gameRoutes from './routes/game.routes.js';
@@ -19,7 +21,8 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 // Middleware
 const allowedOrigins = [
   CLIENT_URL,
-  'https://klikschaak.dedyn.io', // Self-hosted production
+  'https://klikschaak.nl',       // Self-hosted production
+  'https://www.klikschaak.nl',   // Self-hosted production (www)
   'https://localhost',           // Capacitor Android
   'capacitor://localhost',       // Capacitor iOS
   'http://localhost',            // Capacitor fallback
@@ -47,9 +50,15 @@ app.use('/api/auth', authRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/admin', adminRoutes);
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
+// Serve frontend static files in production
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendPath = path.resolve(__dirname, '../../dist');
+app.use(express.static(frontendPath));
+
+// SPA fallback: serve index.html for non-API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
 // Error handler
