@@ -23,7 +23,7 @@ export interface DbUser {
   id: string;
   username: string;
   email: string;
-  password_hash: string;
+  password_hash: string | null;
   friend_code: string;
   created_at: string;
   stats: {
@@ -34,6 +34,8 @@ export interface DbUser {
     gamesAsBlack: number;
   };
   is_admin: boolean;
+  google_id: string | null;
+  email_verified: boolean;
 }
 
 export interface DbInviteCode {

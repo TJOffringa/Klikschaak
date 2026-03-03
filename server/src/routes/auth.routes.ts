@@ -1,5 +1,14 @@
 import { Router, Request, Response } from 'express';
-import { registerUser, loginUser, getUserById } from '../services/auth.service.js';
+import {
+  registerUser,
+  loginUser,
+  getUserById,
+  googleLogin,
+  verifyEmail,
+  resendVerificationEmail,
+  requestPasswordReset,
+  resetPassword,
+} from '../services/auth.service.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
@@ -46,6 +55,87 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/auth/google
+router.post('/google', async (req: Request, res: Response) => {
+  const { idToken } = req.body;
+
+  if (!idToken) {
+    res.status(400).json({ error: 'Missing idToken' });
+    return;
+  }
+
+  const result = await googleLogin(idToken);
+
+  if (result.success) {
+    res.json({
+      user: result.user,
+      token: result.token,
+    });
+  } else {
+    res.status(401).json({ error: result.error });
+  }
+});
+
+// GET /api/auth/verify-email?token=xxx
+router.get('/verify-email', async (req: Request, res: Response) => {
+  const token = req.query.token as string;
+
+  if (!token) {
+    res.status(400).json({ error: 'Missing token' });
+    return;
+  }
+
+  const result = await verifyEmail(token);
+
+  if (result.success) {
+    res.json({ success: true });
+  } else {
+    res.status(400).json({ error: result.error });
+  }
+});
+
+// POST /api/auth/resend-verification
+router.post('/resend-verification', authMiddleware, async (req: Request, res: Response) => {
+  const result = await resendVerificationEmail(req.user!.userId);
+
+  if (result.success) {
+    res.json({ success: true });
+  } else {
+    res.status(400).json({ error: result.error });
+  }
+});
+
+// POST /api/auth/forgot-password
+router.post('/forgot-password', async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  if (!email) {
+    res.status(400).json({ error: 'Missing email' });
+    return;
+  }
+
+  await requestPasswordReset(email);
+  res.json({ success: true }); // Always success to prevent email enumeration
+});
+
+// POST /api/auth/reset-password
+router.post('/reset-password', async (req: Request, res: Response) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    res.status(400).json({ error: 'Missing token or password' });
+    return;
+  }
+
+  const result = await resetPassword(token, password);
+
+  if (result.success) {
+    res.json({ success: true });
+  } else {
+    res.status(400).json({ error: result.error });
+  }
+});
+
 // GET /api/auth/me
 router.get('/me', authMiddleware, async (req: Request, res: Response) => {
   const user = await getUserById(req.user!.userId);
@@ -59,6 +149,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
     id: user.id,
     username: user.username,
     friendCode: user.friend_code,
+    emailVerified: user.email_verified,
     stats: user.stats,
     isAdmin: user.is_admin || false,
   });

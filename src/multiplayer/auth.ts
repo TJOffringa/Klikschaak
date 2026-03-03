@@ -6,6 +6,7 @@ export interface User {
   id: string;
   username: string;
   friendCode: string;
+  emailVerified: boolean;
   stats: {
     wins: number;
     losses: number;
@@ -128,5 +129,133 @@ export async function refreshUserData(): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+export function isEmailVerified(): boolean {
+  return getCurrentUser()?.emailVerified === true;
+}
+
+export async function googleLogin(
+  idToken: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${SERVER_URL}/api/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Google login failed' };
+    }
+
+    saveAuth(data.user, data.token);
+    return { success: true };
+  } catch (error) {
+    console.error('Google login error:', error);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+export async function verifyEmailToken(
+  token: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(
+      `${SERVER_URL}/api/auth/verify-email?token=${encodeURIComponent(token)}`
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Verificatie mislukt' };
+    }
+
+    // Update local user data
+    if (currentUser) {
+      currentUser.emailVerified = true;
+      localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Email verification error:', error);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+export async function resendVerification(): Promise<{ success: boolean; error?: string }> {
+  const token = getAuthToken();
+  if (!token) return { success: false, error: 'Niet ingelogd' };
+
+  try {
+    const response = await fetch(`${SERVER_URL}/api/auth/resend-verification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Kon e-mail niet versturen' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+export async function forgotPassword(
+  email: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${SERVER_URL}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Aanvraag mislukt' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return { success: false, error: 'Network error' };
+  }
+}
+
+export async function resetPassword(
+  token: string,
+  password: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch(`${SERVER_URL}/api/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Reset mislukt' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return { success: false, error: 'Network error' };
   }
 }

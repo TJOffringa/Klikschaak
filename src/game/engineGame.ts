@@ -277,6 +277,6 @@ function executeEngineMove(
 function updateEnginePanel(): void {
   const indicator = document.getElementById('engineThinking');
   if (indicator) {
-    indicator.style.display = engineState.thinking ? 'flex' : 'none';
+    indicator.style.visibility = engineState.thinking ? 'visible' : 'hidden';
   }
 }

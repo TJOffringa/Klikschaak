@@ -225,7 +225,7 @@ function renderEngineGamePanel(): void {
         <span class="engine-game-info">You: ${playerColor}</span>
       </div>
       <div class="engine-game-body">
-        <div id="engineThinking" class="engine-thinking" style="display: ${isEngineThinking() ? 'flex' : 'none'}">
+        <div id="engineThinking" class="engine-thinking" style="visibility: ${isEngineThinking() ? 'visible' : 'hidden'}">
           <span class="thinking-dots"></span>
           <span>Engine thinking...</span>
         </div>

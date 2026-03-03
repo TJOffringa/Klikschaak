@@ -57,7 +57,18 @@
       "Bash(target/release/klikschaak-engine.exe:*)",
       "Bash(tasklist:*)",
       "Bash(./target/release/klikschaak-engine.exe)",
-      "Bash(\"$HOME/.cargo/bin/cargo\" run --release)"
+      "Bash(\"$HOME/.cargo/bin/cargo\" run --release)",
+      "Bash(export PATH:*)",
+      "Bash(wasm-pack:*)",
+      "Bash(cargo install:*)",
+      "Bash(rustup target list:*)",
+      "Bash(netlify deploy:*)",
+      "Bash(npx netlify deploy:*)",
+      "Bash(npx sharp-cli:*)",
+      "Bash(npx gh-pages:*)",
+      "Bash(npx cap init:*)",
+      "Bash(npx cap:*)",
+      "Bash(npx @capacitor/assets generate:*)"
     ]
   }
 }

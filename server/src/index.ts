@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.routes.js';
 import gameRoutes from './routes/game.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import { setupSocketIO } from './socket/index.js';
+import { cleanupExpiredTokens } from './services/auth.service.js';
 
 // Load environment variables
 dotenv.config();
@@ -69,6 +70,9 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 
 // Setup Socket.IO
 const io = setupSocketIO(httpServer, CLIENT_URL);
+
+// Periodically clean up expired tokens (every hour)
+setInterval(cleanupExpiredTokens, 60 * 60 * 1000);
 
 // Start server
 httpServer.listen(PORT, () => {

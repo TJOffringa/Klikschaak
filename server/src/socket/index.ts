@@ -1,6 +1,7 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import { verifyToken } from '../services/auth.service.js';
+import { query } from '../config/database.js';
 import { setupLobbyHandlers } from './handlers/lobby.js';
 import { setupGameHandlers } from './handlers/game.js';
 import type { Player } from '../game/types.js';
@@ -29,7 +30,7 @@ export function setupSocketIO(httpServer: HttpServer, clientUrl: string): Server
   });
 
   // Authentication middleware
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token = socket.handshake.auth.token;
 
     if (!token) {
@@ -39,6 +40,16 @@ export function setupSocketIO(httpServer: HttpServer, clientUrl: string): Server
     const payload = verifyToken(token);
     if (!payload) {
       return next(new Error('Invalid token'));
+    }
+
+    // Check email verification
+    try {
+      const { rows } = await query('SELECT email_verified FROM users WHERE id = $1', [payload.userId]);
+      if (rows.length > 0 && !rows[0].email_verified) {
+        return next(new Error('Email verification required'));
+      }
+    } catch {
+      return next(new Error('Authentication error'));
     }
 
     // Attach user info to socket
