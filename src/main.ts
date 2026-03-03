@@ -28,6 +28,13 @@ document.addEventListener('DOMContentLoaded', () => {
   initAuthUI();
   initAnalysisButton();
   updateStaticTexts();
+
+  // Default handler for "Nieuw Spel" button when lobby is not active
+  document.getElementById('newGameBtn')?.addEventListener('click', () => {
+    if (!document.getElementById('newGameDropdown')) {
+      initGame();
+    }
+  });
 });
 
 function updateStaticTexts(): void {

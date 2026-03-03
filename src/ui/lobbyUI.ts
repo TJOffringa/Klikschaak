@@ -24,6 +24,7 @@ import { openAnalysisFromGame, showAnalysisUI } from './analysisUI.js';
 import { tryExecutePremove } from '../game/actions.js';
 import { clearPremove } from '../multiplayer/premove.js';
 import * as state from '../game/state.js';
+import { initGame } from '../game/actions.js';
 import { startEngineGame, stopEngineGame, isEngineGame, isEngineThinking, getEngineColor, resignEngineGame, offerDrawToEngine } from '../game/engineGame.js';
 import { checkEngineHealth, waitForWasm } from '../analysis/engineCompare.js';
 import { saveGame } from '../game/gameStorage.js';
@@ -32,27 +33,84 @@ let lobbyContainer: HTMLElement | null = null;
 let gameCodeDisplay: HTMLElement | null = null;
 let timerDisplay: HTMLElement | null = null;
 let pendingChallengeId: string | null = null;
+let clickOutsideHandler: ((e: MouseEvent) => void) | null = null;
 
 export function showLobbyUI(): void {
-  // Create lobby container
-  lobbyContainer = document.getElementById('lobbyContainer');
-  if (!lobbyContainer) {
-    lobbyContainer = document.createElement('div');
-    lobbyContainer.id = 'lobbyContainer';
-    document.body.appendChild(lobbyContainer);
-  }
-
+  setupDropdownWrapper();
   renderLobby();
   setupGameCallbacksUI();
-
-  // Listen for online users updates
   setOnUsersUpdate(renderOnlineUsers);
+}
+
+function setupDropdownWrapper(): void {
+  const btn = document.getElementById('newGameBtn');
+  if (!btn) return;
+
+  // Check if already wrapped
+  let wrapper = document.getElementById('newGameWrapper');
+  if (!wrapper) {
+    wrapper = document.createElement('div');
+    wrapper.id = 'newGameWrapper';
+    wrapper.className = 'new-game-wrapper';
+    btn.parentNode!.insertBefore(wrapper, btn);
+    wrapper.appendChild(btn);
+  }
+
+  // Create dropdown container
+  let dropdown = document.getElementById('newGameDropdown');
+  if (!dropdown) {
+    dropdown = document.createElement('div');
+    dropdown.id = 'newGameDropdown';
+    dropdown.className = 'new-game-dropdown';
+    wrapper.appendChild(dropdown);
+  }
+
+  lobbyContainer = dropdown;
+
+  // Set up toggle on button click (remove old listener first)
+  btn.removeEventListener('click', toggleDropdown);
+  btn.addEventListener('click', toggleDropdown);
+
+  // Set up click-outside handler
+  if (clickOutsideHandler) {
+    document.removeEventListener('click', clickOutsideHandler);
+  }
+  clickOutsideHandler = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (wrapper && !wrapper.contains(target)) {
+      closeDropdown();
+    }
+  };
+  document.addEventListener('click', clickOutsideHandler);
+}
+
+function toggleDropdown(e: Event): void {
+  e.stopPropagation();
+  const dropdown = document.getElementById('newGameDropdown');
+  if (dropdown) {
+    dropdown.classList.toggle('open');
+  }
+}
+
+export function openDropdown(): void {
+  const dropdown = document.getElementById('newGameDropdown');
+  if (dropdown) {
+    dropdown.classList.add('open');
+  }
+}
+
+function closeDropdown(): void {
+  const dropdown = document.getElementById('newGameDropdown');
+  if (dropdown) {
+    dropdown.classList.remove('open');
+  }
 }
 
 export function hideLobbyUI(): void {
   if (lobbyContainer) {
     lobbyContainer.innerHTML = '';
   }
+  closeDropdown();
 }
 
 function renderLobby(): void {
@@ -66,85 +124,70 @@ function renderLobby(): void {
 
   lobbyContainer.innerHTML = `
     <div class="lobby-panel">
-      <div class="lobby-header">
-        <h3>Klikschaak</h3>
-        <button id="lobbyToggleBtn" class="lobby-toggle" title="Minimize">\u2212</button>
+      <div class="lobby-section">
+        <button id="localGameBtn" class="lobby-btn local-game">Lokaal spel</button>
       </div>
-      <div id="lobbyBody" class="lobby-body">
-        <div class="lobby-section">
-          <h4 class="section-title">Play vs Engine</h4>
-          <div class="engine-play">
-            <select id="engineColorSelect">
-              <option value="white">White</option>
-              <option value="black">Black</option>
-              <option value="random">Random</option>
+      <div class="lobby-section">
+        <h4 class="section-title">Play vs Engine</h4>
+        <div class="engine-play">
+          <select id="engineColorSelect">
+            <option value="white">White</option>
+            <option value="black">Black</option>
+            <option value="random">Random</option>
+          </select>
+          <button id="enginePlayBtn" class="lobby-btn engine">Play</button>
+        </div>
+        <div id="engineStatus" class="engine-status"></div>
+      </div>
+      <div class="lobby-section">
+        <h4 class="section-title">Online Play</h4>
+        <div class="lobby-actions">
+          <div class="create-game">
+            <select id="timeControlSelect">
+              <option value="bullet">1+0</option>
+              <option value="blitz-3">3+0</option>
+              <option value="blitz-5">5+0</option>
+              <option value="rapid-7">7+0</option>
+              <option value="standard" selected>7+5</option>
+              <option value="custom">Custom</option>
             </select>
-            <button id="enginePlayBtn" class="lobby-btn engine">Play</button>
+            <button id="createGameBtn" class="lobby-btn">Create</button>
           </div>
-          <div id="engineStatus" class="engine-status"></div>
-        </div>
-        <div class="lobby-section">
-          <h4 class="section-title">Online Play</h4>
-          <div class="lobby-actions">
-            <div class="create-game">
-              <select id="timeControlSelect">
-                <option value="bullet">1+0</option>
-                <option value="blitz-3">3+0</option>
-                <option value="blitz-5">5+0</option>
-                <option value="rapid-7">7+0</option>
-                <option value="standard" selected>7+5</option>
-                <option value="custom">Custom</option>
-              </select>
-              <button id="createGameBtn" class="lobby-btn">Create</button>
-            </div>
-            <div class="custom-time hidden" id="customTimeInputs">
-              <div class="custom-time-row">
-                <input type="number" id="customMinutes" placeholder="Min" min="1" max="60" value="10">
-                <span>+</span>
-                <input type="number" id="customIncrement" placeholder="Sec" min="0" max="60" value="0">
-              </div>
-            </div>
-            <div class="join-game">
-              <input type="text" id="gameCodeInput" placeholder="Game Code" maxlength="6">
-              <button id="joinGameBtn" class="lobby-btn">Join</button>
+          <div class="custom-time hidden" id="customTimeInputs">
+            <div class="custom-time-row">
+              <input type="number" id="customMinutes" placeholder="Min" min="1" max="60" value="10">
+              <span>+</span>
+              <input type="number" id="customIncrement" placeholder="Sec" min="0" max="60" value="0">
             </div>
           </div>
-          <div id="gameCodeDisplay" class="game-code-display hidden"></div>
-          <div id="waitingMessage" class="waiting-message hidden"></div>
-          <div id="challengeNotification" class="challenge-notification hidden"></div>
-          <div class="online-users">
-            <h4>Online (<span id="onlineCount">0</span>)</h4>
-            <ul id="onlineUsersList"></ul>
+          <div class="join-game">
+            <input type="text" id="gameCodeInput" placeholder="Game Code" maxlength="6">
+            <button id="joinGameBtn" class="lobby-btn">Join</button>
           </div>
         </div>
-        <div class="lobby-section">
-          <button id="lobbyAnalysisBtn" class="lobby-btn analysis">Analyse</button>
+        <div id="gameCodeDisplay" class="game-code-display hidden"></div>
+        <div id="waitingMessage" class="waiting-message hidden"></div>
+        <div id="challengeNotification" class="challenge-notification hidden"></div>
+        <div class="online-users">
+          <h4>Online (<span id="onlineCount">0</span>)</h4>
+          <ul id="onlineUsersList"></ul>
         </div>
+      </div>
+      <div class="lobby-section">
+        <button id="lobbyAnalysisBtn" class="lobby-btn analysis">Analyse</button>
       </div>
     </div>
   `;
 
-  // Start collapsed on mobile
-  const isMobile = window.innerWidth <= 768;
-  if (isMobile) {
-    const body = document.getElementById('lobbyBody');
-    const btn = document.getElementById('lobbyToggleBtn');
-    if (body && btn) {
-      body.classList.add('collapsed');
-      btn.textContent = '+';
-      btn.title = 'Expand';
-    }
-  }
-
-  // Toggle lobby body
-  document.getElementById('lobbyToggleBtn')?.addEventListener('click', () => {
-    const body = document.getElementById('lobbyBody');
-    const btn = document.getElementById('lobbyToggleBtn');
-    if (body && btn) {
-      const collapsed = body.classList.toggle('collapsed');
-      btn.textContent = collapsed ? '+' : '\u2212';
-      btn.title = collapsed ? 'Expand' : 'Minimize';
-    }
+  // "Lokaal spel" button: reset board + close dropdown
+  document.getElementById('localGameBtn')?.addEventListener('click', () => {
+    stopEngineGame();
+    setBoardFlipped(false);
+    state.setGameOver(false);
+    const overlay = document.getElementById('gameOverOverlay');
+    if (overlay) overlay.remove();
+    initGame();
+    closeDropdown();
   });
 
   // Event listeners
@@ -155,6 +198,7 @@ function renderLobby(): void {
   });
 
   document.getElementById('lobbyAnalysisBtn')?.addEventListener('click', () => {
+    closeDropdown();
     hideLobbyUI();
     showAnalysisUI();
   });
@@ -243,6 +287,9 @@ function renderEngineGamePanel(): void {
     </div>
   `;
 
+  // Keep dropdown open during engine game
+  openDropdown();
+
   document.getElementById('engineAnalyzeBtn')?.addEventListener('click', () => {
     const moves = state.getMoveHistory();
     const whiteName = engineColor === 'white' ? 'Engine' : 'You';
@@ -250,6 +297,7 @@ function renderEngineGamePanel(): void {
     const overlay = document.getElementById('gameOverOverlay');
     if (overlay) overlay.remove();
     stopEngineGame();
+    closeDropdown();
     openAnalysisFromGame(moves, whiteName, blackName);
   });
 
@@ -284,7 +332,6 @@ function renderEngineGamePanel(): void {
     setBoardFlipped(false);
     state.initializeBoard();
     state.setGameOver(false);
-    // Remove any game over overlay
     const overlay = document.getElementById('gameOverOverlay');
     if (overlay) overlay.remove();
     renderBoard();
@@ -322,7 +369,6 @@ function renderOnlineUsers(users: LobbyUser[]): void {
       `)
       .join('') || '<li class="no-users">No other players online</li>';
 
-    // Add click listeners for challengeable users
     list.querySelectorAll('.online-user.challengeable').forEach(el => {
       el.addEventListener('click', () => {
         const userId = el.getAttribute('data-user-id');
@@ -351,7 +397,6 @@ function handleCreateGame(): void {
 
   createGame(timeControl, customSettings);
 
-  // Show waiting message
   const waitingMsg = document.getElementById('waitingMessage');
   if (waitingMsg) {
     waitingMsg.classList.remove('hidden');
@@ -393,11 +438,9 @@ function setupGameCallbacksUI(): void {
     },
 
     onGameStarted: (gameState) => {
-      // Flip board for black player
       const isBlack = gameState.myColor === 'black';
       setBoardFlipped(isBlack);
 
-      // Hide lobby panel during game - show timers in correct order based on perspective
       if (lobbyContainer) {
         const topTimer = isBlack ? 'white' : 'black';
         const bottomTimer = isBlack ? 'black' : 'white';
@@ -428,6 +471,10 @@ function setupGameCallbacksUI(): void {
             <div id="drawNotification" class="draw-notification hidden"></div>
           </div>
         `;
+
+        // Keep dropdown open during online game
+        openDropdown();
+
         timerDisplay = document.getElementById('timerDisplay');
         document.getElementById('resignBtn')?.addEventListener('click', () => {
           if (confirm('Are you sure you want to resign?')) {
@@ -443,11 +490,9 @@ function setupGameCallbacksUI(): void {
           }
         });
 
-        // Listen for draw events
         setupDrawListeners();
       }
 
-      // Update board with game state
       syncBoardFromOnline(gameState);
       renderBoard();
       updateUI();
@@ -461,9 +506,7 @@ function setupGameCallbacksUI(): void {
       updateTimerDisplay(gameState.timer.white, gameState.timer.black, gameState.currentTurn);
       updateOnlineIndicator();
 
-      // If it's now our turn, try to execute any pending premove
       if (gameState.currentTurn === gameState.myColor) {
-        // Small delay to ensure board is rendered before premove
         setTimeout(() => {
           tryExecutePremove();
         }, 50);
@@ -480,7 +523,6 @@ function setupGameCallbacksUI(): void {
     onGameOver: (result) => {
       if (!result) return;
 
-      // Clear any pending premove
       clearPremove();
 
       const gameState = getOnlineGameState();
@@ -508,7 +550,6 @@ function setupGameCallbacksUI(): void {
         message = 'Game drawn by agreement.';
       }
 
-      // Show game over modal
       showGameOverModal(message);
     },
 
@@ -519,30 +560,24 @@ function setupGameCallbacksUI(): void {
 }
 
 function syncBoardFromOnline(gameState: OnlineGameState): void {
-  // Reset local state and apply online state
   state.initializeBoard();
 
-  // Copy board
   for (let r = 0; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
       state.setBoardSquare(r, c, [...gameState.board[r][c].pieces]);
     }
   }
 
-  // Set turn
   while (state.getCurrentTurn() !== gameState.currentTurn) {
     state.switchTurn();
   }
 
-  // Set en passant
   state.setEnPassantTarget(gameState.enPassantTarget);
 
-  // Clear and rebuild moved pawns
   for (const pawn of gameState.movedPawns) {
     state.addMovedPawn(pawn);
   }
 
-  // Move history
   for (const entry of gameState.moveHistory) {
     if (!state.getMoveHistory().find(e => e.notation === entry.notation)) {
       state.addMoveToHistory(entry);
@@ -579,7 +614,6 @@ function formatTime(ms: number): string {
 }
 
 function updateOnlineIndicator(): void {
-  // Update turn indicator to show if it's your turn
   const turnIndicator = document.getElementById('currentTurnIndicator');
   if (turnIndicator && isOnline()) {
     const myTurn = isMyTurn();
@@ -596,7 +630,6 @@ function showGameOverModal(message: string): void {
   const showRematch = lastGame !== null;
   const gameState = getOnlineGameState();
 
-  // Save online game to IndexedDB
   if (gameState) {
     const whiteName = gameState.myColor === 'white'
       ? (getCurrentUser()?.username || 'You')
@@ -631,7 +664,6 @@ function showGameOverModal(message: string): void {
   `;
   document.body.appendChild(modal);
 
-  // Close on X or click outside
   document.getElementById('modalCloseBtn')?.addEventListener('click', () => {
     closeGameOverAndReturnToLobby(modal);
   });
@@ -639,10 +671,8 @@ function showGameOverModal(message: string): void {
     if (e.target === modal) closeGameOverAndReturnToLobby(modal);
   });
 
-  // Analysis button handler
   document.getElementById('analyzeGameBtn')?.addEventListener('click', () => {
     modal.remove();
-    // Get move history and player names
     const moves = gameState?.moveHistory || state.getMoveHistory();
     const white = gameState?.myColor === 'white'
       ? getCurrentUser()?.username
@@ -651,16 +681,14 @@ function showGameOverModal(message: string): void {
       ? getCurrentUser()?.username
       : gameState?.opponent?.username;
 
-    // Leave the online game state
     leaveOnlineGame();
     clearLastGameInfo();
     setBoardFlipped(false);
+    closeDropdown();
 
-    // Open analysis mode with the game moves
     openAnalysisFromGame(moves, white, black);
   });
 
-  // Setup rematch listeners
   setupRematchListeners(modal);
 
   document.getElementById('rematchBtn')?.addEventListener('click', () => {
@@ -686,10 +714,9 @@ function closeGameOverAndReturnToLobby(modal: HTMLElement): void {
   modal.remove();
   leaveOnlineGame();
   clearLastGameInfo();
-  clearPremove(); // Clear any pending premove
-  setBoardFlipped(false); // Reset board orientation
+  clearPremove();
+  setBoardFlipped(false);
   renderLobby();
-  // Re-setup callbacks since we recreated the lobby
   setupGameCallbacksUI();
   setOnUsersUpdate(renderOnlineUsers);
 }
@@ -698,14 +725,12 @@ function setupRematchListeners(modal: HTMLElement): void {
   const socket = getSocket();
   if (!socket) return;
 
-  // Remove existing listeners to avoid duplicates
   socket.off('game:rematch-received');
   socket.off('game:rematch-sent');
   socket.off('game:rematch-declined');
   socket.off('game:rematch-expired');
   socket.off('game:rematch-error');
 
-  // Received rematch request
   socket.on('game:rematch-received', (data: { rematchId: string; requesterName: string }) => {
     const rematchStatus = document.getElementById('rematchStatus');
     if (rematchStatus) {
@@ -730,7 +755,6 @@ function setupRematchListeners(modal: HTMLElement): void {
     }
   });
 
-  // Rematch was declined
   socket.on('game:rematch-declined', () => {
     const rematchStatus = document.getElementById('rematchStatus');
     if (rematchStatus) {
@@ -743,7 +767,6 @@ function setupRematchListeners(modal: HTMLElement): void {
     }
   });
 
-  // Rematch expired
   socket.on('game:rematch-expired', () => {
     const rematchStatus = document.getElementById('rematchStatus');
     if (rematchStatus) {
@@ -756,7 +779,6 @@ function setupRematchListeners(modal: HTMLElement): void {
     }
   });
 
-  // Rematch error
   socket.on('game:rematch-error', (data: { message: string }) => {
     const rematchStatus = document.getElementById('rematchStatus');
     if (rematchStatus) {
@@ -769,7 +791,6 @@ function setupRematchListeners(modal: HTMLElement): void {
     }
   });
 
-  // Game started (rematch accepted) - close modal
   socket.on('game:started', () => {
     modal.remove();
   });
@@ -888,7 +909,6 @@ function setupChallengeListeners(): void {
   const socket = getSocket();
   if (!socket) return;
 
-  // Remove existing listeners to avoid duplicates
   socket.off('lobby:challenge-received');
   socket.off('lobby:challenge-sent');
   socket.off('lobby:challenge-declined');
@@ -896,7 +916,6 @@ function setupChallengeListeners(): void {
   socket.off('lobby:challenge-expired');
   socket.off('lobby:challenge-error');
 
-  // Received a challenge
   socket.on('lobby:challenge-received', (data: {
     challengeId: string;
     challengerId: string;
@@ -913,6 +932,9 @@ function setupChallengeListeners(): void {
       const increment = Math.floor(data.customSettings.increment / 1000);
       timeLabel = `${minutes}+${increment}`;
     }
+
+    // Open dropdown to show incoming challenge
+    openDropdown();
 
     notification.classList.remove('hidden');
     notification.innerHTML = `
@@ -936,12 +958,10 @@ function setupChallengeListeners(): void {
     });
   });
 
-  // Challenge was sent successfully
   socket.on('lobby:challenge-sent', (data: { challengeId: string }) => {
     pendingChallengeId = data.challengeId;
   });
 
-  // Challenge was declined
   socket.on('lobby:challenge-declined', (data: { declinedBy: string }) => {
     pendingChallengeId = null;
     const notification = document.getElementById('challengeNotification');
@@ -951,7 +971,6 @@ function setupChallengeListeners(): void {
     }
   });
 
-  // Challenge was cancelled by challenger
   socket.on('lobby:challenge-cancelled', () => {
     const notification = document.getElementById('challengeNotification');
     if (notification) {
@@ -960,7 +979,6 @@ function setupChallengeListeners(): void {
     }
   });
 
-  // Challenge expired
   socket.on('lobby:challenge-expired', () => {
     pendingChallengeId = null;
     const notification = document.getElementById('challengeNotification');
@@ -970,7 +988,6 @@ function setupChallengeListeners(): void {
     }
   });
 
-  // Challenge error
   socket.on('lobby:challenge-error', (data: { message: string }) => {
     pendingChallengeId = null;
     const notification = document.getElementById('challengeNotification');

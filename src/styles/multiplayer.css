@@ -203,17 +203,31 @@
   color: #fef3c7;
 }
 
-/* Lobby Container */
-#lobbyContainer {
-  position: fixed;
-  top: 60px;
-  right: 10px;
-  z-index: 90;
-  width: 280px;
+/* New Game Dropdown Wrapper */
+.new-game-wrapper {
+  position: relative;
+}
+
+.new-game-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 300px;
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 200;
+  margin-top: 6px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.new-game-dropdown.open {
+  display: block;
 }
 
 .lobby-panel {
-  background: rgba(30, 41, 59, 0.95);
+  background: rgba(30, 41, 59, 0.97);
   padding: 16px;
   border-radius: 12px;
   border: 1px solid rgba(148, 163, 184, 0.2);
@@ -239,28 +253,16 @@
   content: '';
 }
 
-.lobby-toggle {
-  background: none;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  color: #94a3b8;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Local game button */
+.lobby-btn.local-game {
+  width: 100%;
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  font-size: 14px;
+  padding: 10px 14px;
 }
 
-.lobby-toggle:hover {
-  background: rgba(148, 163, 184, 0.15);
-  color: #f1f5f9;
-}
-
-.lobby-body.collapsed {
-  display: none;
+.lobby-btn.local-game:hover {
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4);
 }
 
 .lobby-actions {
@@ -1113,21 +1115,12 @@
     margin: 5px 5px 0;
   }
 
-  /* On mobile: panels flow in the page instead of floating over the board */
-  body {
-    display: flex;
-    flex-direction: column;
+  .new-game-dropdown {
+    width: 280px;
   }
 
-  #lobbyContainer {
-    position: static !important;
-    width: auto !important;
-    margin: 5px 0;
-  }
-
-  /* Engine game panel appears above the board */
-  #lobbyContainer:has(.engine-game-panel) {
-    order: -1;
+  .lobby-panel {
+    padding: 12px;
   }
 
   .engine-game-panel {
@@ -1156,17 +1149,13 @@
   }
 
   .engine-game-actions {
-    grid-template-columns: 1fr 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 4px;
   }
 
   .engine-game-actions .lobby-btn {
     padding: 6px 4px;
     font-size: 11px;
-  }
-
-  .lobby-panel {
-    padding: 12px;
   }
 
   .timer-display {
