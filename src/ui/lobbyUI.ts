@@ -78,6 +78,8 @@ function setupDropdownWrapper(): void {
   clickOutsideHandler = (e: MouseEvent) => {
     const target = e.target as HTMLElement;
     if (wrapper && !wrapper.contains(target)) {
+      // Don't close during active games - resign/draw buttons must stay visible
+      if (isEngineGame() || isOnline()) return;
       closeDropdown();
     }
   };
